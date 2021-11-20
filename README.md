@@ -20,6 +20,8 @@ Get "Free Trial" Dashboard: All feature / no time limitation!
 
 ## Step 4: Configure Credentials
 
+Copy paste the command from the "Setup" tab in the Service Portal, 
+should look like this:
 
     kubectl create secret generic monitoring-secret -n monitoring \
       --from-literal=id="XXXXXXXXXXXXXX" \
