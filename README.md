@@ -6,9 +6,11 @@ Detailed docu: https://k8s-mon.online-service.cloud/
 
 ## Step 1: Get credentials
 
+Get a monitoring dashboard:
+
 https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
 
-Get "Free Trial" Dashboard: All feature / no time limitation!
+Get "Free Trial" dashboard: All feature / no time limitation!
 
 ## Step2: Create a new namespace
 
@@ -20,7 +22,7 @@ Get "Free Trial" Dashboard: All feature / no time limitation!
 
 ## Step 4: Configure Credentials
 
-Copy paste the command from the "Setup" tab in the Service Portal, 
+Copy/paste the command from the "Setup" tab in the Service Portal, 
 should look like this:
 
     kubectl create secret generic monitoring-secret -n monitoring \
