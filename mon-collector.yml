@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mon-collector
+  annotations:
+    GitLabProject: https://github.com/ma-ha/k8s-mon-collector
+spec:
+  selector:
+    matchLabels:
+      app: mon-collector
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mon-collector
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: mon-collector  
+      containers:
+      - name: mon-collector
+        image: k8s-mon-collector
+        env:
+        - name: EKOSYS_ID
+          valueFrom:
+            secretKeyRef:
+              name: monitoring-secret
+              key: id
+        - name: EKOSYS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: monitoring-secret
+              key: key
+        - name: DATA_INTERVAL
+          value: "60000"
+        - name: NODE_ENV
+          value: PRD
+        - name: AZMON_COLLECT_ENV
+          value: "False"
+        resources:
+          requests:
+            memory: "56Mi"
+            cpu: "5m"
+          limits:
+            memory: "256Mi"
+            cpu: "1000m"
+        securityContext:
+          capabilities: 
+            drop:
+            - ALL
+          procMount: Default
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
