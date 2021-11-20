@@ -1,12 +1,14 @@
 # Kubernetes Monitoring Collector
 
-Detailed installation instructions: https://k8s-mon.online-service.cloud/
+Detailed docu: https://k8s-mon.online-service.cloud/
 
 # TL;DR
 
 ## Step 1: Get credentials
 
 https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
+
+Get "Free Trial" Dashboard: All feature / no time limitation!
 
 ## Step2: Create a new namespace
 
