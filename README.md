@@ -21,7 +21,7 @@ https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a
     kubectl apply -f mon-collector.yml -n monitoring 
 
 
-# Installation Process explained
+# Installation Process Explained
 
 The original config files and he 
 
