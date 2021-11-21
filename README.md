@@ -2,25 +2,40 @@
 
 Detailed docu: https://k8s-mon.online-service.cloud/
 
-# TL;DR
+You need to get credentials for a "Monitoring Dashboaed" per cluster.
 
-## Step 1: Get credentials
-
-Get a monitoring dashboard:
+An unlimited "Free Trial" should be enough for Dev or small clusters:
 
 https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
 
-Get "Free Trial" dashboard: All feature / no time limitation!
+"Free Trial" dashboard has all feature and no time limitation!
 
-## Step2: Create a new namespace
+
+# TL;DR
+
+    kubectl create namespace monitoring 
+    kubectl apply -f mon-collector-rbac.yml -n monitoring 
+    kubectl create secret generic monitoring-secret -n monitoring \
+          --from-literal=id="$DASHBOARD_ID" \
+          --from-literal=key="$DASHBOARD_KEY" 
+    kubectl apply -f mon-collector.yml -n monitoring 
+
+
+# Installation Process explained
+
+The original config files and he 
+
+## Step 1: Create a new namespace
 
     kubectl create namespace monitoring 
 
-## Step3: Setup RBAC 
+## Step 2: Setup RBAC 
+
+The collector pod should only have read access to the Kubernetes API server:
 
     kubectl apply -f mon-collector-rbac.yml -n monitoring 
 
-## Step 4: Configure Credentials
+## Step 3: Configure Credentials
 
 Copy/paste the command from the "Setup" tab in the Service Portal, 
 should look like this:
@@ -29,11 +44,19 @@ should look like this:
       --from-literal=id="XXXXXXXXXXXXXX" \
       --from-literal=key="YYYYYYYYYYYYYYYY" 
 
-## Step 5: Deploy the Collector Pod
+## Step 4: Deploy the Collector Pod
+
+Only one pod is required:
 
     kubectl apply -f mon-collector.yml -n monitoring 
+
+The deployment should be compliant to best practice security policies.
+
+The Collector Service is open source, you're welcome to review the source code.
 
 ## Done :-)
 
 Navigate to https://k8s-mon.online-service.cloud, 
 login and configure the dashboard.
+
+Don't forget to configure alarms (E-Mail or Webhook) in the Service Portal.
