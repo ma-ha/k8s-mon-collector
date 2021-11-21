@@ -23,7 +23,7 @@ https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a
 
 # Installation Process Explained
 
-The original config files and he 
+The original config files and here: https://github.com/ma-ha/k8s-mon-collector
 
 ## Step 1: Create a new namespace
 
