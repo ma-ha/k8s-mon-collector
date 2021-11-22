@@ -18,13 +18,13 @@ const kindMap ={
   Job         : 'j'
 }
 
-let k8sApi = null
+let k8sApi  = null
 let k8sApps = null
 let k8sJobs = null
 let k8sJobB = null
 let k8sNetw = null
-let k8sMetrics = null 
 let k8sLogs = null
+let k8sMetrics = null 
 let collCfg = []
 let plan = null
 
@@ -131,10 +131,8 @@ async function getDta() {
       container.log.push({ ts: l.dt, log: l.log })
       cnt --
     }
-    // log.info( 'cluster', JSON.stringify( cluster.namespace, null, ' ' ) )
     // log.info( 'cluster', cluster.node )
-    // log.info( 'cluster', cluster.namespace.ekosys )
-    // log.info( 'cluster', cluster.namespace.default )
+    // log.info( 'cluster', cluster.namespace )
   } catch ( exc ) {
     log.error( 'getDta', exc )
     return null
@@ -351,20 +349,13 @@ function getPodWithAllDetails( pod, aPod, svc ) {
     }        
     if ( svc.ingressRules ) {
       pod.in = svc.ingressRules
-      // pod.ingress = svc.ingressRules
     }
     if ( aPod.status.containerStatuses ) {
       for ( let c of aPod.status.containerStatuses ) {
-        // log.info( 'c-status', c )
-        // let cId = c.containerID
-        // if ( cId.indexOf( 'containerd:' ) == 0 ) {
-        //   cId = cId.substring( 13 )
-        // }
         pod.c[ c.name ] = {
           s  : ( c.started ? 'running' :'terminated' ),
           sr : c.reason,
           rc : c.restartCount,
-          // n  : c.name,
           ci : c.image,
           lt : Date.now(),
           log : []
