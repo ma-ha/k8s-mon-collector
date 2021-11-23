@@ -1,3 +1,5 @@
+# IMPORTANT: This is work in progress!!!
+
 # Kubernetes Monitoring Collector
 
 Detailed docu: https://k8s-mon.online-service.cloud/

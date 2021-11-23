@@ -36,9 +36,15 @@ async function init( ) {
     
     if ( cfg.CTX ) { 
       kc.loadFromOptions( cfg.CTX )
+    } else if ( process.env.CTX_SERVER ) { 
+      log.info( 'KubeConfig from env, server=', process.env.CTX_SERVER  )
+      kc.loadFromDefault()
+      kc.clusters[0].server = process.env.CTX_SERVER
     } else {
+      log.info( 'KubeConfig loadFromDefault...' )
       kc.loadFromDefault()
     }
+    log.info( 'kc', kc )
 
     k8sApi  = kc.makeApiClient( k8s.CoreV1Api )
     k8sApps = kc.makeApiClient( k8s.AppsV1Api )
@@ -131,8 +137,7 @@ async function getDta() {
       container.log.push({ ts: l.dt, log: l.log })
       cnt --
     }
-    // log.info( 'cluster', cluster.node )
-    // log.info( 'cluster', cluster.namespace )
+    // log.info( 'cluster', cluster )
   } catch ( exc ) {
     log.error( 'getDta', exc )
     return null
