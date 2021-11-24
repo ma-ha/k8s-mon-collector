@@ -4,12 +4,24 @@ metadata:
   name: mon-collector
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: mon-collector
 rules:
-- apiGroups: [""] # "" indicates the core API group
-  resources: ["pods"]
+- apiGroups: [""] # indicates the core API group
+  resources: ["pods", "pods/log","nodes","namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"] 
+  resources: ["deployments","statefulsets","daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch.v1beta1","batch"] 
+  resources: ["cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"] 
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"] 
+  resources: ["pods","nodes"]
   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -20,6 +32,20 @@ subjects:
 - kind: ServiceAccount
   name: mon-collector
 roleRef:
-  kind: Role
+  kind: ClusterRole
+  name: mon-collector
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: mon-collector-cb
+subjects:
+- kind: ServiceAccount
+  name: mon-collector
+  namespace: ekosys
+roleRef:
+  kind: ClusterRole
   name: mon-collector
   apiGroup: rbac.authorization.k8s.io

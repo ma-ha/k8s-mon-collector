@@ -34,17 +34,21 @@ async function init( ) {
   try {
     const kc = new k8s.KubeConfig()
     
-    if ( cfg.CTX ) { 
+    if ( process.env.KUBERNETES_SERVICE_HOST ) { 
+      log.info( 'KubeConfig loadFromCluster...' )
+      kc.loadFromCluster()
+    } else if ( cfg.CTX ) { 
+      log.info( 'KubeConfig from cfg.CTX' )
       kc.loadFromOptions( cfg.CTX )
     } else if ( process.env.CTX_SERVER ) { 
       log.info( 'KubeConfig from env, server=', process.env.CTX_SERVER  )
       kc.loadFromDefault()
       kc.clusters[0].server = process.env.CTX_SERVER
-    } else {
+    } else{
       log.info( 'KubeConfig loadFromDefault...' )
       kc.loadFromDefault()
     }
-    log.info( 'kc', kc )
+    log.debug( 'kc', kc )
 
     k8sApi  = kc.makeApiClient( k8s.CoreV1Api )
     k8sApps = kc.makeApiClient( k8s.AppsV1Api )

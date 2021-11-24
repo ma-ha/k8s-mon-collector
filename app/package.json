@@ -1,6 +1,6 @@
 {
   "name": "mon-collector",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Collect monitoring data and forward to monitoring central",
   "main": "app.js",
   "scripts": {

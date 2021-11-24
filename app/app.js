@@ -34,7 +34,7 @@ async function getDtaFromK8sAPI() {
   if ( ! dta ) {
     log.error( 'Got no data to transfer!' )
     errCnt ++
-    if ( errCnt > 10 ) { process.exit(1) }
+    if ( errCnt > 10 ) { process.exit(1) } // otherwise no one might see the problem 
     return
   }
   dta.collector = pjson.version
