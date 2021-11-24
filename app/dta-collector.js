@@ -48,7 +48,7 @@ async function init( ) {
       log.info( 'KubeConfig loadFromDefault...' )
       kc.loadFromDefault()
     }
-    log.debug( 'kc', kc )
+    log.verbose( 'kc', kc )
 
     k8sApi  = kc.makeApiClient( k8s.CoreV1Api )
     k8sApps = kc.makeApiClient( k8s.AppsV1Api )
