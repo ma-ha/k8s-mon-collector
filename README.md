@@ -1,4 +1,4 @@
-# IMPORTANT: This is work in progress!!!
+
 
 # Kubernetes Monitoring Collector
 
