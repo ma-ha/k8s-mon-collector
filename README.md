@@ -2,24 +2,31 @@
 
 # Kubernetes Monitoring Collector
 
-Detailed docu: https://k8s-mon.online-service.cloud/
+This is a monitoring "collector" pod running in your cluster and reading info from the Kubernetes API and metrics API. 
 
-You need to get credentials for a "Monitoring Dashboaed" per cluster.
+The data is sent to a [Monitoring SaaS](https://www.kubernetes-monitor.com/). 
+There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (email and/or webhook per namespace) to your DevOps teams .
 
-An unlimited "Free Trial" should be enough for Dev or small clusters:
+Detailed docu: https://www.kubernetes-monitor.com/
+
+
+![Dashboard](/img/dashboard.png)
+
+# TL;DR
+
+You need to generate credentials for a "Monitoring Dashboard" per cluster:
 
 https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
 
-"Free Trial" dashboard has all feature and no time limitation!
+("Free Trial" credentials unlock all feature and has no time limitation.)
 
-
-# TL;DR
+Install the "collector" pod:
 
     kubectl create namespace monitoring 
     kubectl apply -f mon-collector-rbac.yml -n monitoring 
     kubectl create secret generic monitoring-secret -n monitoring \
-          --from-literal=id="$DASHBOARD_ID" \
-          --from-literal=key="$DASHBOARD_KEY" 
+          --from-literal=id="$MONITORING_ID" \
+          --from-literal=key="$MONITORING_KEY" 
     kubectl apply -f mon-collector.yml -n monitoring 
 
 
@@ -58,7 +65,7 @@ The Collector Service is open source, you're welcome to review the source code.
 
 ## Done :-)
 
-Navigate to https://k8s-mon.online-service.cloud, 
+Navigate to https://www.kubernetes-monitor.com/, 
 login and configure the dashboard.
 
 Don't forget to configure alarms (E-Mail or Webhook) in the Service Portal.
