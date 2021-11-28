@@ -10,7 +10,7 @@ There you can configure a web dashboard and configure alarms (missing data, pod 
 Detailed docu: https://www.kubernetes-monitor.com/
 
 
-![Dashboard](/img/dashboard.png)
+![Web Dashboard](https://github.com/ma-ha/k8s-mon-collector/blob/main/img/dashoard.png)
 
 # TL;DR
 
