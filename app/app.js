@@ -28,6 +28,7 @@ async function start() {
 start()
 
 let errCnt = 0 
+let errorState = false
 async function getDtaFromK8sAPI() {
   log.verbose( 'gathering data ...')
   let dta = await kubernetes.getDta()
@@ -35,12 +36,20 @@ async function getDtaFromK8sAPI() {
     log.error( 'Got no data to transfer!' )
     errCnt ++
     if ( errCnt > 10 ) { process.exit(1) } // otherwise no one might see the problem 
+    errorState = true
     return
   }
   dta.collector = pjson.version
   dta.interval  = dtaInterval
   if ( dta ) {
     let collCfg = await dtaSender.sendDta( dta )
-    kubernetes.setCfg( collCfg )
+    //log.info( 'send data > response', collCfg)
+    if (  collCfg ) {
+      kubernetes.setCfg( collCfg )
+      if ( errorState  || kubernetes.getErrState() ) {
+        errorState = false
+        log.info( 'OK, back to normal operation :-)')
+      }
+    }
   }
 }

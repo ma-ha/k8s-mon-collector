@@ -8,7 +8,8 @@ const stream = require( 'stream' )
 exports: module.exports = {
   init,
   setCfg,
-  getDta
+  getDta,
+  getErrState
 }
 
 const kindMap ={
@@ -58,6 +59,8 @@ async function init( ) {
     k8sMetrics = new k8s.Metrics( kc )
     k8sLogs    = new k8s.Log(kc);
 
+    setInterval( reSubscribeLogs, 1000 * 60 * cfg.LOG_RENEW_STREAM_MIN )
+
   } catch ( exc ) {
     console.error( exc )
     log.error( exc )
@@ -70,7 +73,7 @@ async function init( ) {
 function setCfg( collectorCfg ) {
   if ( ! collectorCfg ) { return }
   if ( collectorCfg.restart === true ) {
-    log.inf( 'Restart requested by Monitoring Central' )
+    log.info( 'Restart requested by Monitoring Central' )
     process.exit( 0 )
   }
   if ( collectorCfg.plan ) {
@@ -81,37 +84,84 @@ function setCfg( collectorCfg ) {
   }
 }
 
-let logStreams = {}
+//-----------------------------------------------------------------------------
+let errorState = false
+
+function getErrState() {
+  let result = errorState 
+  errorState = false
+  return result
+}
+
+//-----------------------------------------------------------------------------
+// https://nodejs.org/api/stream.html#readabledestroyerror
+let logStreamMap = {}
 let podLogs = []
 
+function reSubscribeLogs() {
+  //log.info( 'reSubscribeLogs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+  for ( let streamId in logStreamMap ) {
+    let oldStream = logStreamMap[ streamId ].logStream
+    //log.info( 'subscribePodLogs, destroy old stream', streamId )
+    oldStream.destroy()
+    logStreamMap[ streamId ].logStream = null
+    subscribeContainerLogs( 
+      logStreamMap[ streamId ].ns, 
+      logStreamMap[ streamId ].ms, 
+      logStreamMap[ streamId ].pod, 
+      logStreamMap[ streamId ].container 
+      )
+  }
+}
 async function subscribePodLogs( ns, ms, podName, pod ) {
+  for ( let containerName in pod.c ) {
+    subscribeContainerLogs( ns, ms, podName, containerName )
+  }
+}
+
+async function subscribeContainerLogs( ns, ms, podName, containerName ) {
   try {
-    for ( let containerName in pod.c ) {
-      // let containerName = pod.c[ cId ].n 
-      if ( ! logStreams[ ns+'/'+podName ]  ) {
-
-        const logStream = new stream.PassThrough();
-
-        logStream.on('data', (chunk) => {
-          podLogs.push({
-            dt  : Date.now(),
-            ns  : ns, 
-            ms  : ms, 
-            po  : podName, 
-            c   : containerName,
-            log : chunk + ''
-          })
-          //log.info( podName, chunk+'' )
-        })
-
-        logStreams[ ns+'/'+podName ] = logStream
-
-        k8sLogs.log( ns, podName, containerName, logStream, 
-          { follow: true, tailLines: 50, pretty: false, timestamps: false } )
-        .catch( err => { log.error( 'k8sLogs',  ns, podName, containerName, err.message ) } )
-        .then( req => {} )
+    let streamId =ns+'/'+podName+'/'+containerName
+    let tailLines = 50
+    if ( ! logStreamMap[ streamId ]  ) { // first time
+      //log.info( 'subscribePodLogs initial', streamId )
+      logStreamMap[ streamId ] = {
+        ns        : ns, 
+        ms        : ms,
+        pod       : podName, 
+        container : containerName,
+        logStream : null
       }
-    }  
+    } else { 
+      if ( logStreamMap[ streamId ].logStream ) {
+        return // nothing to do
+      } else { // strea was destroyed to resubscribe
+        //log.info( 'subscribePodLogs resubscribe', streamId )
+        tailLines = 0
+      }
+    }
+
+    const logStream = new stream.PassThrough();
+
+    logStream.on( 'data', (chunk) => {
+      podLogs.push({
+        dt  : Date.now(),
+        ns  : ns, 
+        ms  : ms, 
+        po  : podName, 
+        c   : containerName,
+        log : chunk + ''
+      })
+      // log.info( 'Log...', podName, containerName, chunk+'' )
+    })
+
+    logStreamMap[ streamId ].logStream = logStream
+
+    k8sLogs.log( ns, podName, containerName, logStream, 
+      { follow: true, tailLines: tailLines, pretty: false, timestamps: false } )
+    .catch( err => { log.error( 'k8sLogs',  ns, podName, containerName, err.message ) } )
+    .then( req => {} )
+    
   } catch ( exc ) {
     log.warn( 'getLogs' , exc.message )
   }
@@ -137,13 +187,21 @@ async function getDta() {
     let cnt = podLogs.length
     while ( cnt != 0 ) {
       let l = podLogs.shift() 
-      let container = cluster.namespace[ l.ns ][ l.ms ][ l.po ].c[ l.c ]
-      container.log.push({ ts: l.dt, log: l.log })
+      try {
+        let container = cluster.namespace[ l.ns ][ l.ms ][ l.po ].c[ l.c ]
+        container.log.push({ ts: l.dt, log: l.log })  
+      } catch ( exc ) {
+        log.warn( 'add log to container', l.ns, l.ms, l.po, l.c )
+        log.warn( 'add log to container', exc )
+      }
       cnt --
     }
-    // log.info( 'cluster', cluster )
+    // log.info( 'cluster', cluster.node  )
+    // log.info( 'cluster', cluster  )
+
   } catch ( exc ) {
     log.error( 'getDta', exc )
+    errorState = true
     return null
   }
   return cluster
@@ -182,7 +240,7 @@ async function loadMS( ns ) {
       // log.info( d.metadata.name, d.metadata )
       obj['Ingress'][ d.metadata.name ] = d.spec.rules
     }
-  } catch ( e ) { log.warn( 'listNamespacedIngress', e.message ) } 
+  } catch ( e ) { log.warn( 'list Ingress', ns, e.message ); errorState = true } 
 
   try {
     let lst = await k8sApps.listNamespacedDeployment( ns )
@@ -197,28 +255,28 @@ async function loadMS( ns ) {
         }
       }
     }
-  } catch ( e ) { log.warn( 'listNamespacedDeployment',  e.message ) } 
+  } catch ( e ) { log.warn( 'list Deployment', ns, e.message ); errorState = true } 
   try {
     let lst = await k8sApps.listNamespacedDaemonSet( ns )
     for ( let d of lst.body.items ) {
       // log.info( d.metadata.name,  d.spec.selector )
       obj['DaemonSet'][ d.metadata.name ] = d.spec.selector
     }
-  } catch ( e ) { log.warn( 'listNamespacedDaemonSet',  e.message ) } 
+  } catch ( e ) { log.warn( 'list DaemonSet', ns, e.message ); errorState = true } 
   try {
     let lst = await k8sApps.listNamespacedStatefulSet( ns )
     for ( let d of lst.body.items ) {
       // log.info( d.metadata.name, d.spec.selector )
       obj['StatefulSet'][ d.metadata.name ] = d.spec.selector
     }
-  } catch ( e ) { log.warn( 'listNamespacedStatefulSet',  e.message ) } 
+  } catch ( e ) { log.warn( 'list StatefulSet', ns, e.message ); errorState = true } 
   try {
     let lst = await k8sJobs.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
       // log.info( d.metadata.name, d )
       obj['Job'][ d.metadata.name ] = {}
     }  
-  } catch ( e ) { log.verbose( 'listNamespacedCronJob',  e.message ) } 
+  } catch ( e ) { log.verbose( 'list CronJob', ns, e.message ); } 
   
   try {
     let lst = await k8sJobB.listNamespacedCronJob( ns )
@@ -226,7 +284,7 @@ async function loadMS( ns ) {
       // log.info( d.metadata.name, d.spec )
       obj['Job'][ d.metadata.name ] = {}
     }
-  } catch ( e ) { log.warn( 'listNamespacedCronJob', e.message ) } 
+  } catch ( e ) { log.warn( 'list CronJob.b', ns, e.message ); errorState = true } 
 
   return obj
 }
@@ -288,7 +346,10 @@ async function getPodMetrics( ns ) {
         mem : memMB
       }
     }
-  } catch ( e ) { log.warn( 'getPodMetrics', ns, e.message ) }
+  } catch ( e ) { 
+    log.warn( 'getPodMetrics', ns, e.message ) 
+    errorState = true
+  }
   return podMetrics
 }
 
@@ -337,6 +398,7 @@ async function getPods( ns, nodes ) {
           
       } catch ( exc ) {
         log.warn( 'getPods', exc )
+        errorState = true
       }
     }
   }
@@ -374,7 +436,10 @@ function getPodWithAllDetails( pod, aPod, svc ) {
         )
       }
     }
-  } catch ( e ) { log.warn( 'getPodWithAllDetails', e.message, aPod ) }
+  } catch ( e ) { 
+    log.warn( 'getPodWithAllDetails', e.message, aPod )
+    errorState = true
+   }
   return pod
 }
 

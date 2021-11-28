@@ -1,2 +1,3 @@
 MONITORING_CENTRAL_URL: https://k8s-mon.online-service.cloud/mon/dta
 DATA_INTERVAL: 10000
+LOG_RENEW_STREAM_MIN: 30

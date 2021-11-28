@@ -20,7 +20,7 @@ spec:
       serviceAccountName: mon-collector  
       containers:
       - name: mon-collector
-        image: leancloudservices/k8s-mon-collector:1.0.6
+        image: leancloudservices/k8s-mon-collector:1.1.0
         env:
         - name: EKOSYS_ID
           valueFrom:
@@ -35,7 +35,7 @@ spec:
         - name: CTX_SERVER
           value: https://10.0.0.1:443
         - name: DATA_INTERVAL
-          value: "60000"
+          value: "30000"
         - name: NODE_ENV
           value: PRD
         - name: AZMON_COLLECT_ENV
