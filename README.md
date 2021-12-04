@@ -59,6 +59,8 @@ Only one pod is required:
 
     kubectl apply -f mon-collector.yml -n monitoring 
 
+(This command can also be used to update the image version later.)
+
 The deployment should be compliant to best practice security policies.
 
 The Collector Service is open source, you're welcome to review the source code.
