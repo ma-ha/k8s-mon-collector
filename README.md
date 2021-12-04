@@ -69,3 +69,16 @@ Navigate to https://www.kubernetes-monitor.com/,
 login and configure the dashboard.
 
 Don't forget to configure alarms (E-Mail or Webhook) in the Service Portal.
+
+# Build Private Registry Image
+
+To build a collector docker image an upload it to your private registry,
+please follow the instructions in [README-BUILD.md](README-BUILD.md).
+
+Don't forget to change the container image in [mon-collector.yml](mon-collector.yml).
+
+# License
+
+CC-BY-ND 4.0
+
+https://creativecommons.org/licenses/by-nd/4.0/
