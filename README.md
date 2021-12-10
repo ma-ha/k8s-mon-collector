@@ -5,7 +5,7 @@
 This is a monitoring "collector" pod running in your cluster and reading info from the Kubernetes API and metrics API. 
 
 The data is sent to a [Monitoring SaaS](https://www.kubernetes-monitor.com/). 
-There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (email and/or webhook per namespace) to your DevOps teams .
+There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (email and/or webhook per namespace) to your DevOps teams.
 
 Detailed docu: https://www.kubernetes-monitor.com/
 

@@ -1,13 +1,13 @@
 {
   "name": "mon-collector",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Collect monitoring data and forward to monitoring central",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
   "author": "MA-HA",
-  "license": "UNLICENSED",
+  "license": "Creative Commons Attribution-NoDerivatives 4.0 International License",
   "dependencies": {
     "@kubernetes/client-node": "^0.16.0",
     "axios": "^0.21.4",

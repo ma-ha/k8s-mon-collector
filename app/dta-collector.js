@@ -363,7 +363,7 @@ async function getPodMetrics( ns ) {
     } catch ( exc) { log.warn( 'getPodMetrics', ns, pod.Pod.metadata.name, exc.message )  }
   } catch ( e ) { 
     log.warn( 'getPodMetrics ns', ns) 
-    log.warn( 'getPodMetrics', ns, e ) 
+    log.warn( 'getPodMetrics', ns, e.message ) 
     errorState = true
   }
   return podMetrics
