@@ -34,6 +34,11 @@ Install the "collector" pod:
 
 The original config files and here: https://github.com/ma-ha/k8s-mon-collector
 
+To get the files we recommend to clone this repo:
+
+    git clone https://github.com/ma-ha/k8s-mon-collector.git
+    cd k8s-mon-collector
+
 ## Step 1: Create a new namespace
 
     kubectl create namespace monitoring 
@@ -59,7 +64,19 @@ Only one pod is required:
 
     kubectl apply -f mon-collector.yml -n monitoring 
 
-(This command can also be used to update the image version later.)
+Check the logs, there should be no errors. 
+
+    kubectl get pods-n monitoring
+    
+Status should be "Running"
+
+    kubectl logs mon-collector-XXXXXXXX-XXXXX -n monitoring
+
+Should look like:
+
+    info Starting mon-collector vX.Y.Z NODE_ENV=PRD 
+    info KubeConfig loadFromCluster... 
+
 
 The deployment should be compliant to best practice security policies.
 
@@ -71,6 +88,18 @@ Navigate to https://www.kubernetes-monitor.com/,
 login and configure the dashboard.
 
 Don't forget to configure alarms (E-Mail or Webhook) in the Service Portal.
+
+# Update the Collector Version
+
+Checkout [CHANGELOG.md](CHANGELOG.md) for fixes and improvements. 
+
+To update the collector in your cluster, simply do:
+
+    cd k8s-mon-collector
+    git pull
+    kubectl apply -f mon-collector.yml -n monitoring 
+
+Easy ... again check the pod status and the logs (see above).
 
 # Build Private Registry Image
 
