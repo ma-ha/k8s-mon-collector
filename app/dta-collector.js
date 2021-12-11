@@ -235,39 +235,66 @@ async function getNamespaceArr() {
 
 //-----------------------------------------------------------------------------
 
+function noDefaultBackend( name ) {
+  if ( name.indexOf( 'backend' ) >= 0 ) { return false }
+  if ( name.indexOf( 'error' ) >= 0 ) { return false }
+  return true
+}
+
 async function loadMS( ns ) {
   let obj = {
     'ReplicaSet': {},
     'DaemonSet': {},
     'StatefulSet':{},
     'Job':{},
+    'MinionIngress':{},
     'Ingress':{}
   }
+  let ingressCtlr = {}
 
   try {
     let lst = await k8sNetw.listNamespacedIngress( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name, d.status.loadBalancer )
-      log.verbose( d.metadata.name, JSON.stringify( d.spec.rules ) )
-      // log.info( d.metadata.name, d.metadata )
-      obj['Ingress'][ d.metadata.name ] = d.spec.rules
+      log.verbose( d.metadata.name, JSON.stringify( d, null, '  ' ) )
+      if ( d.metadata && d.metadata.annotations && d.metadata.annotations['nginx.org/mergeable-ingress-type'] ) {
+        obj[ 'MinionIngress' ][ d.metadata.name ] = d.spec.rules
+      } else {
+        obj[ 'Ingress' ][ d.metadata.name ] = d.spec.rules
+      }
     }
   } catch ( e ) { log.warn( 'list Ingress', ns, e.message ); errorState = true } 
 
   try {
     let lst = await k8sApps.listNamespacedDeployment( ns )
     for ( let d of lst.body.items ) {
-      log.verbose( d.metadata.name,  d.spec.selector )
+      // log.info( d.metadata.name,  d.spec.selector )
       obj['ReplicaSet'][ d.metadata.name ] = d.spec.selector
-      if ( d.spec.selector.matchLabels['app.kubernetes.io/part-of'] ){ 
+      // check, if there are ingress rules to attach
+      if ( d.spec.selector.matchLabels['app.kubernetes.io/part-of'] ) { 
         let p = d.spec.selector.matchLabels['app.kubernetes.io/part-of']
-        if ( obj.Ingress[ p ] ) {
+        if ( obj.Ingress[ p ] && noDefaultBackend( d.metadata.name ) ) {
           obj['ReplicaSet'][ d.metadata.name ].ingressRules = obj.Ingress[ p ]
+          let host = obj.Ingress[ p ][0].host
+          ingressCtlr[ host ] = obj['ReplicaSet'][ d.metadata.name ]
+          //log.info( host,  d.metadata.name , obj['ReplicaSet'][ d.metadata.name ] )
           log.verbose(  d.metadata.name, obj['ReplicaSet'][ d.metadata.name ] )
         }
       }
     }
   } catch ( e ) { log.warn( 'list Deployment', ns, e.message ); errorState = true } 
+  try {
+    // merge minions
+    for ( let dn in ingressCtlr ) {
+      for ( let minion in obj['MinionIngress'] ) {
+        log.verbose( 'minion', minion , obj['MinionIngress'][minion] )
+        for ( let minionRule of obj['MinionIngress'][minion] ) {
+          ingressCtlr[ dn ].ingressRules.push( minionRule )
+        }
+      }
+      log.verbose( 'ingress merged', dn , JSON.stringify( ingressCtlr[ dn ], null, ' ') )
+    }
+  } catch ( e ) { log.warn( 'add Ingress Minions', ns, e.message ); errorState = true } 
+  
   try {
     let lst = await k8sApps.listNamespacedDaemonSet( ns )
     for ( let d of lst.body.items ) {

@@ -1,3 +1,9 @@
+# 1.3.0
+- merge minion ingress rules
+
+# 1.2.1
+- less noisy exception log
+
 # 1.2.0
 - logs: toggle to swtich off collection and transfer, by server request
 - transfer CPU/mem limits

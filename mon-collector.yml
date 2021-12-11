@@ -20,7 +20,7 @@ spec:
       serviceAccountName: mon-collector  
       containers:
       - name: mon-collector
-        image: leancloudservices/k8s-mon-collector:1.2.1
+        image: leancloudservices/k8s-mon-collector:1.3.0
         env:
         - name: EKOSYS_ID
           valueFrom:
