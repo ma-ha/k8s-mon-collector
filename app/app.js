@@ -18,14 +18,23 @@ if ( process.env.DATA_INTERVAL ) {
   dtaInterval = process.env.DATA_INTERVAL
 }
 
-async function start() {
-  await kubernetes.init()
-  getDtaFromK8sAPI() // this will send basic data and returns scope: ns + ms
-  getDtaFromK8sAPI() // this will send now all details in scope
-  setInterval( getDtaFromK8sAPI, dtaInterval )
+let logInterval = cfg.LOG_INTERVAL
+if ( process.env.LOG_INTERVAL ) {
+  logInterval = process.env.LOG_INTERVAL
 }
 
+async function start() {
+  await kubernetes.init()
+  await getDtaFromK8sAPI() // this will send basic data and returns scope: ns + ms
+  await getDtaFromK8sAPI() // this will send now all details in scope
+  console.log( 'Sending data every '+dtaInterval+' ms')
+  setInterval( getDtaFromK8sAPI, dtaInterval )
+  console.log( 'Sending logs every '+logInterval+' ms')
+  setInterval( processLogs, logInterval )
+}
+logInterval
 start()
+
 
 let errCnt = 0 
 let errorState = false
@@ -39,9 +48,9 @@ async function getDtaFromK8sAPI() {
     errorState = true
     return
   }
-  dta.collector = pjson.version
-  dta.interval  = dtaInterval
   if ( dta ) {
+    dta.collector = pjson.version
+    dta.interval  = dtaInterval
     let collCfg = await dtaSender.sendDta( dta )
     //log.info( 'send data > response', collCfg)
     if (  collCfg ) {
@@ -51,5 +60,15 @@ async function getDtaFromK8sAPI() {
         log.info( 'OK, back to normal operation :-)')
       }
     }
+  }
+}
+
+async function processLogs() {
+  let logs = kubernetes.getLogs()
+  log.verbose( 'logs', logs )
+  if ( logs ) {
+    logs.collector = pjson.version
+    logs.interval  = dtaInterval
+    await dtaSender.sendLogs( logs )
   }
 }

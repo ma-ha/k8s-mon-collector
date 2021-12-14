@@ -1,3 +1,6 @@
+# 1.4.0
+- send logs separately
+
 # 1.3.0
 - merge minion ingress rules
 

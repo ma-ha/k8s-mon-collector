@@ -9,6 +9,7 @@ exports: module.exports = {
   init,
   setCfg,
   getDta,
+  getLogs,
   getErrState
 }
 
@@ -73,9 +74,11 @@ async function init( ) {
 //-----------------------------------------------------------------------------
 
 function setCfg( collectorCfg ) {
+  log.verbose( 'setCfg', collectorCfg )
   if ( ! collectorCfg ) { return }
   if ( collectorCfg.restart === true ) {
     log.info( 'Restart requested by Monitoring Central' )
+    log.info( 'Reason: ', collectorCfg.restartReason )
     process.exit( 0 )
   }
   if ( collectorCfg.plan ) {
@@ -105,6 +108,33 @@ function getErrState() {
 // https://nodejs.org/api/stream.html#readabledestroyerror
 let logStreamMap = {}
 let podLogs = []
+
+function getLogs() {
+  let cnt = podLogs.length
+  if ( cnt > 0 ) {
+    let result = {}
+    while ( cnt != 0 ) {
+      let l = podLogs.shift() 
+      try {
+        let cid = l.ns + l.ms
+        if ( ! result[ cid ] ) {
+          result[ cid ] = {
+            ns   : l.ns,
+            ms   : l.ms,
+            pod  : l.po,
+            logs : []
+          }
+        }
+        result[ cid ].logs.push({ ts: l.dt, log: l.log })  
+      } catch ( exc ) {
+        log.warn( 'add log to container', l.ns, l.ms, l.po, l.c, exc )
+      }
+      cnt --
+    }
+    return result
+  }
+  return null
+}
 
 function reSubscribeLogs() {
   //log.info( 'reSubscribeLogs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -196,18 +226,18 @@ async function getDta() {
         cluster.namespace[ ns ][ p ] = pod
       }
     }
-    let cnt = podLogs.length
-    while ( cnt != 0 ) {
-      let l = podLogs.shift() 
-      try {
-        let container = cluster.namespace[ l.ns ][ l.ms ][ l.po ].c[ l.c ]
-        container.log.push({ ts: l.dt, log: l.log })  
-      } catch ( exc ) {
-        log.warn( 'add log to container', l.ns, l.ms, l.po, l.c )
-        log.warn( 'add log to container', exc )
-      }
-      cnt --
-    }
+    // let cnt = podLogs.length
+    // while ( cnt != 0 ) {
+    //   let l = podLogs.shift() 
+    //   try {
+    //     let container = cluster.namespace[ l.ns ][ l.ms ][ l.po ].c[ l.c ]
+    //     container.log.push({ ts: l.dt, log: l.log })  
+    //   } catch ( exc ) {
+    //     log.warn( 'add log to container', l.ns, l.ms, l.po, l.c )
+    //     log.warn( 'add log to container', exc )
+    //   }
+    //   cnt --
+    // }
     log.verbose( 'cluster', cluster.node  )
     log.verbose( 'cluster', cluster  )
 
@@ -389,7 +419,6 @@ async function getPodMetrics( ns ) {
       } 
     } catch ( exc) { log.warn( 'getPodMetrics', ns, pod.Pod.metadata.name, exc.message )  }
   } catch ( e ) { 
-    log.warn( 'getPodMetrics ns', ns) 
     log.warn( 'getPodMetrics', ns, e.message ) 
     errorState = true
   }
@@ -475,8 +504,7 @@ function getPodWithAllDetails( pod, aPod, svc ) {
           sr : c.reason,
           rc : c.restartCount,
           ci : c.image,
-          lt : Date.now(),
-          log : []
+          lt : Date.now()
         }
         if ( c.restartCount > pod.PodRestartCount ) (
           pod.rc = c.restartCount 
