@@ -1,4 +1,9 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH  */
+/*  Copyright (c) 2021 Lean Cloud Services GmbH
+
+    This work is licensed under 
+    Creative Commons Attribution-NoDerivatives 4.0 International License.
+    http://creativecommons.org/licenses/by-nd/4.0/ 
+*/
 
 const cfg    = require( 'config' )
 const log    = require( 'npmlog' )
@@ -137,7 +142,7 @@ function getLogs() {
 }
 
 function reSubscribeLogs() {
-  //log.info( 'reSubscribeLogs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+  log.verbose( 'reSubscribeLogs')
   for ( let streamId in logStreamMap ) {
     let oldStream = logStreamMap[ streamId ].logStream
     log.verbose( 'subscribePodLogs, destroy old stream', streamId )
@@ -153,6 +158,7 @@ function reSubscribeLogs() {
     }
   }
 }
+
 async function subscribePodLogs( ns, ms, podName, pod ) {
   if ( collectLogs ) {
     for ( let containerName in pod.c ) {
@@ -226,23 +232,12 @@ async function getDta() {
         cluster.namespace[ ns ][ p ] = pod
       }
     }
-    // let cnt = podLogs.length
-    // while ( cnt != 0 ) {
-    //   let l = podLogs.shift() 
-    //   try {
-    //     let container = cluster.namespace[ l.ns ][ l.ms ][ l.po ].c[ l.c ]
-    //     container.log.push({ ts: l.dt, log: l.log })  
-    //   } catch ( exc ) {
-    //     log.warn( 'add log to container', l.ns, l.ms, l.po, l.c )
-    //     log.warn( 'add log to container', exc )
-    //   }
-    //   cnt --
-    // }
+   
     log.verbose( 'cluster', cluster.node  )
     log.verbose( 'cluster', cluster  )
 
   } catch ( exc ) {
-    log.error( 'getDta', exc )
+    log.error( 'getDta', exc.message )
     errorState = true
     return null
   }
@@ -278,7 +273,8 @@ async function loadMS( ns ) {
     'StatefulSet':{},
     'Job':{},
     'MinionIngress':{},
-    'Ingress':{}
+    'Ingress':{},
+    '_ing': {}
   }
   let ingressCtlr = {}
 
@@ -286,10 +282,9 @@ async function loadMS( ns ) {
     let lst = await k8sNetw.listNamespacedIngress( ns )
     for ( let d of lst.body.items ) {
       log.verbose( d.metadata.name, JSON.stringify( d, null, '  ' ) )
-      if ( d.metadata && d.metadata.annotations && d.metadata.annotations['nginx.org/mergeable-ingress-type'] ) {
-        obj[ 'MinionIngress' ][ d.metadata.name ] = d.spec.rules
-      } else {
-        obj[ 'Ingress' ][ d.metadata.name ] = d.spec.rules
+      obj[ '_ing' ][ d.metadata.name ] = {
+        a : d.metadata.annotations,
+        r : d.spec.rules
       }
     }
   } catch ( e ) { log.warn( 'list Ingress', ns, e.message ); errorState = true } 
@@ -297,33 +292,10 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sApps.listNamespacedDeployment( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name,  d.spec.selector )
+      log.verbose( d.metadata.name,  d.spec.selector )
       obj['ReplicaSet'][ d.metadata.name ] = d.spec.selector
-      // check, if there are ingress rules to attach
-      if ( d.spec.selector.matchLabels['app.kubernetes.io/part-of'] ) { 
-        let p = d.spec.selector.matchLabels['app.kubernetes.io/part-of']
-        if ( obj.Ingress[ p ] && noDefaultBackend( d.metadata.name ) ) {
-          obj['ReplicaSet'][ d.metadata.name ].ingressRules = obj.Ingress[ p ]
-          let host = obj.Ingress[ p ][0].host
-          ingressCtlr[ host ] = obj['ReplicaSet'][ d.metadata.name ]
-          //log.info( host,  d.metadata.name , obj['ReplicaSet'][ d.metadata.name ] )
-          log.verbose(  d.metadata.name, obj['ReplicaSet'][ d.metadata.name ] )
-        }
-      }
     }
   } catch ( e ) { log.warn( 'list Deployment', ns, e.message ); errorState = true } 
-  try {
-    // merge minions
-    for ( let dn in ingressCtlr ) {
-      for ( let minion in obj['MinionIngress'] ) {
-        log.verbose( 'minion', minion , obj['MinionIngress'][minion] )
-        for ( let minionRule of obj['MinionIngress'][minion] ) {
-          ingressCtlr[ dn ].ingressRules.push( minionRule )
-        }
-      }
-      log.verbose( 'ingress merged', dn , JSON.stringify( ingressCtlr[ dn ], null, ' ') )
-    }
-  } catch ( e ) { log.warn( 'add Ingress Minions', ns, e.message ); errorState = true } 
   
   try {
     let lst = await k8sApps.listNamespacedDaemonSet( ns )
@@ -342,7 +314,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sJobs.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name, d )
+      log.verbose( d.metadata.name, d )
       obj['Job'][ d.metadata.name ] = {}
     }  
   } catch ( e ) { log.verbose( 'list CronJob', ns, e.message ); } 
@@ -350,7 +322,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sJobB.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name, d.spec )
+      log.verbose( d.metadata.name, d.spec )
       obj['Job'][ d.metadata.name ] = {}
     }
   } catch ( e ) { log.warn( 'list CronJob.b', ns, e.message ); errorState = true } 
@@ -382,17 +354,10 @@ function getMsName( aPod, obj ) {
         }
       }
       if ( match ) {
-        if ( mgr[ x ].ingressRules ) {
-          return { 
-            msName : x,
-            ingressRules : mgr[ x ].ingressRules
-          }
-        }
         return { msName : x }
       }
     }
   }
-  return  { msName : aPod.metadata.name }
 }
 
 function getMemMB( mem ) {
@@ -432,6 +397,8 @@ async function getPods( ns, nodes ) {
   let po = await k8sApi.listNamespacedPod( ns )
 
   let obj = await loadMS( ns )
+  pods[ '_ing' ] = obj[ '_ing' ]
+
   let podMetrics = await getPodMetrics( ns )
 
   if ( po.body && po.body.items ) {
@@ -442,12 +409,13 @@ async function getPods( ns, nodes ) {
         let ms   = svc.msName
         let kind = aPod.metadata.ownerReferences[0].kind
         let podName = aPod.metadata.name
+        log.verbose( podName, svc )  
 
         let pod = { }
         
         if ( collCfg.indexOf( ns+'/'+ms ) >= 0 ) { // Pod is in scope !!
           // log.info( 'collCfg', ns+'/'+ms, collCfg  )
-          pod = getPodWithAllDetails( pod, aPod, svc )
+          pod = getPodWithAllDetails( pod, aPod )
           if ( podMetrics[ podName ] ) {
             pod.cpu  =  podMetrics[ podName ].cpu
             pod.mem  =  podMetrics[ podName ].mem 
@@ -469,11 +437,16 @@ async function getPods( ns, nodes ) {
         pod.k = ( kindMap[ kind ] ? kindMap[ kind ] : kind )
         pod.s = aPod.status.phase
         
-        if ( ! pods[ ms ] ) { pods[ ms ] = {} }
+        if ( ! pods[ ms ] ) { 
+          pods[ ms ] = {}
+          // if ( obj[ kind ][ ms ] && obj[ kind ][ ms ].matchLabels ) {
+          //   pods[ ms ][ '_s' ] = obj[ kind ][ ms ].matchLabels
+          // } 
+        }
         pods[ ms ][ podName ] = pod
           
       } catch ( exc ) {
-        log.warn( 'getPods', exc )
+        log.warn( 'getPods', exc.message )
         errorState = true
       }
     }
@@ -484,7 +457,7 @@ async function getPods( ns, nodes ) {
 
 //-----------------------------------------------------------------------------
 
-function getPodWithAllDetails( pod, aPod, svc ) {
+function getPodWithAllDetails( pod, aPod ) {
   try {
     pod = { 
       ct : (new Date( aPod.metadata.creationTimestamp )).getTime(),
@@ -493,9 +466,6 @@ function getPodWithAllDetails( pod, aPod, svc ) {
       ip : aPod.status.podIP,
       rc : 0,
       lt : Date.now()
-    }        
-    if ( svc.ingressRules ) {
-      pod.in = svc.ingressRules
     }
     if ( aPod.status.containerStatuses ) {
       for ( let c of aPod.status.containerStatuses ) {

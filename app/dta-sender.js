@@ -1,4 +1,9 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH  */
+/*  Copyright (c) 2021 Lean Cloud Services GmbH
+
+    This work is licensed under 
+    Creative Commons Attribution-NoDerivatives 4.0 International License.
+    http://creativecommons.org/licenses/by-nd/4.0/ 
+*/
 
 const axios = require( 'axios' )
 const cfg   = require( 'config' )
@@ -38,11 +43,11 @@ async function send( dta, path ) {
         resolve( req.data )
       }).catch( error => {
         log.warn( 'send', path, error.message )
-        resolve()
+        resolve({ error:error.message })
       })
     } catch ( exc ) {
       log.error( 'send', path, exc.message )
-      resolve()
+      resolve({ error:error.message })
     }
   })
 }

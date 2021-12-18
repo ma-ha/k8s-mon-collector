@@ -1,3 +1,6 @@
+# 1.4.1
+- handle ingresses more flexible
+
 # 1.4.0
 - send logs separately
 

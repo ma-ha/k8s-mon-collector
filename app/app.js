@@ -1,4 +1,9 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH  */
+/*  Copyright (c) 2021 Lean Cloud Services GmbH
+
+    This work is licensed under 
+    Creative Commons Attribution-NoDerivatives 4.0 International License.
+    http://creativecommons.org/licenses/by-nd/4.0/ 
+*/
 
 const pjson      = require( './package.json' )
 const cfg        = require( 'config' )
@@ -27,7 +32,6 @@ async function start() {
   await kubernetes.init()
   await getDtaFromK8sAPI() // this will send basic data and returns scope: ns + ms
   await getDtaFromK8sAPI() // this will send now all details in scope
-  console.log( 'Sending data every '+dtaInterval+' ms')
   setInterval( getDtaFromK8sAPI, dtaInterval )
   console.log( 'Sending logs every '+logInterval+' ms')
   setInterval( processLogs, logInterval )
@@ -52,8 +56,9 @@ async function getDtaFromK8sAPI() {
     dta.collector = pjson.version
     dta.interval  = dtaInterval
     let collCfg = await dtaSender.sendDta( dta )
-    //log.info( 'send data > response', collCfg)
-    if (  collCfg ) {
+    if ( collCfg.error ) {
+      errorState = true
+    } else if (  collCfg ) {
       kubernetes.setCfg( collCfg )
       if ( errorState  || kubernetes.getErrState() ) {
         errorState = false
