@@ -1,3 +1,6 @@
+# 1.4.2
+- send logs on demand (to avoid "Payload too large" errors)
+
 # 1.4.1
 - handle ingresses more flexible
 

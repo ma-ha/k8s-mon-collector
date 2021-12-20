@@ -11,7 +11,7 @@ const log        = require( 'npmlog' )
 const kubernetes = require( './dta-collector' )
 const dtaSender  = require( './dta-sender' )
 
-log.info( `Starting ${pjson.name} v${pjson.version} NODE_ENV=${process.env.NODE_ENV}` )
+log.info( `Starting ${pjson.name} v${pjson.version}`, `NODE_ENV=${process.env.NODE_ENV}` )
 
 if ( ! cfg.MONITORING_CENTRAL_URL ) {
   log.error( 'Configuration required!')
@@ -29,19 +29,22 @@ if ( process.env.LOG_INTERVAL ) {
 }
 
 async function start() {
-  await kubernetes.init()
+  await kubernetes.init( dtaSender )
   await getDtaFromK8sAPI() // this will send basic data and returns scope: ns + ms
   await getDtaFromK8sAPI() // this will send now all details in scope
   setInterval( getDtaFromK8sAPI, dtaInterval )
-  console.log( 'Sending logs every '+logInterval+' ms')
+  log.info( 'Sending logs every '+logInterval+' ms ... and on demand')
   setInterval( processLogs, logInterval )
+  setInterval( printStatistics, 1000*60*60 )
 }
 logInterval
 start()
 
 
 let errCnt = 0 
+let sndDtaCnt = 0
 let errorState = false
+
 async function getDtaFromK8sAPI() {
   log.verbose( 'gathering data ...')
   let dta = await kubernetes.getDta()
@@ -64,16 +67,23 @@ async function getDtaFromK8sAPI() {
         errorState = false
         log.info( 'OK, back to normal operation :-)')
       }
+      sndDtaCnt++
     }
   }
 }
 
 async function processLogs() {
-  let logs = kubernetes.getLogs()
-  log.verbose( 'logs', logs )
-  if ( logs ) {
-    logs.collector = pjson.version
-    logs.interval  = dtaInterval
-    await dtaSender.sendLogs( logs )
-  }
+  await kubernetes.pushLogs()
+}
+
+function printStatistics() {
+  let logStat = kubernetes.getLogStat()
+  log.info( (new Date()).toISOString(), 
+    'Metrics sent:', sndDtaCnt,
+    'Logs sent:', logStat,
+    'Errors:', errCnt,
+  )
+  kubernetes.resetLogStat()
+  sndDtaCnt = 0
+  errCnt = 0
 }

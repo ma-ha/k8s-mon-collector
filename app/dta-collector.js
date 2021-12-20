@@ -14,7 +14,9 @@ exports: module.exports = {
   init,
   setCfg,
   getDta,
-  getLogs,
+  pushLogs,
+  getLogStat,
+  resetLogStat,
   getErrState
 }
 
@@ -37,10 +39,13 @@ let plan = null
 // collector may get config not send out logs (compliance...)
 let collectLogs = true
 
+let dtaSender = null
+
 //-----------------------------------------------------------------------------
 
-async function init( ) {
+async function init( sender ) {
   try {
+    dtaSender = sender 
     const kc = new k8s.KubeConfig()
     
     if ( process.env.KUBERNETES_SERVICE_HOST ) { 
@@ -113,36 +118,52 @@ function getErrState() {
 // https://nodejs.org/api/stream.html#readabledestroyerror
 let logStreamMap = {}
 let podLogs = []
+let pushing = false
+let logCntTot = 0
 
-function getLogs() {
+async function pushLogs() {
+  if ( pushing ) { return }
+  pushing = true
   let cnt = podLogs.length
-  if ( cnt > 0 ) {
-    let result = {}
+  log.verbose( 'push logs', cnt )
+  if ( cnt > cfg.LOG_SND_MAX_CNT ) { cnt = cfg.LOG_SND_MAX_CNT }
+  if ( cnt > 0 ) try {
+    let logs = {}
     while ( cnt != 0 ) {
-      let l = podLogs.shift() 
-      try {
+      let l = podLogs.shift()
+      if ( l ) try { // prevent problems if pushLogs() runs multiple times
         let cid = l.ns + l.ms
-        if ( ! result[ cid ] ) {
-          result[ cid ] = {
+        if ( ! logs[ cid ] ) {
+          logs[ cid ] = {
             ns   : l.ns,
             ms   : l.ms,
             pod  : l.po,
             logs : []
           }
         }
-        result[ cid ].logs.push({ ts: l.dt, log: l.log })  
-      } catch ( exc ) {
-        log.warn( 'add log to container', l.ns, l.ms, l.po, l.c, exc )
-      }
+        logs[ cid ].logs.push({ ts: l.dt, log: l.log })  
+        logCntTot ++
+      } catch ( exc ) { log.warn( 'pushLogs', l.ns, l.ms, l.po, l.c, exc.message ) }
       cnt --
     }
-    return result
-  }
-  return null
+    // send out the logs
+    await dtaSender.sendLogs( logs )
+
+  } catch ( err ) { log.warn( 'pushLogs', err.message ) }
+  pushing = false
 }
 
+function getLogStat() {
+  return logCntTot
+}
+
+function resetLogStat() {
+  logCntTot = 0
+}
+
+
 function reSubscribeLogs() {
-  log.verbose( 'reSubscribeLogs')
+  //log.info( 'reSubscribeLogs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
   for ( let streamId in logStreamMap ) {
     let oldStream = logStreamMap[ streamId ].logStream
     log.verbose( 'subscribePodLogs, destroy old stream', streamId )
@@ -158,7 +179,6 @@ function reSubscribeLogs() {
     }
   }
 }
-
 async function subscribePodLogs( ns, ms, podName, pod ) {
   if ( collectLogs ) {
     for ( let containerName in pod.c ) {
@@ -191,7 +211,7 @@ async function subscribeContainerLogs( ns, ms, podName, containerName ) {
 
     const logStream = new stream.PassThrough();
 
-    logStream.on( 'data', (chunk) => {
+    logStream.on( 'data', async (chunk) => {
       podLogs.push({
         dt  : Date.now(),
         ns  : ns, 
@@ -200,6 +220,9 @@ async function subscribeContainerLogs( ns, ms, podName, containerName ) {
         c   : containerName,
         log : chunk + ''
       })
+      if ( podLogs.length >= cfg.LOG_SND_MAX_CNT ) {
+        await pushLogs()
+      }
       // log.info( 'Log...', podName, containerName, chunk+'' )
     })
 
@@ -276,7 +299,6 @@ async function loadMS( ns ) {
     'Ingress':{},
     '_ing': {}
   }
-  let ingressCtlr = {}
 
   try {
     let lst = await k8sNetw.listNamespacedIngress( ns )
@@ -292,7 +314,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sApps.listNamespacedDeployment( ns )
     for ( let d of lst.body.items ) {
-      log.verbose( d.metadata.name,  d.spec.selector )
+      // log.info( d.metadata.name,  d.spec.selector )
       obj['ReplicaSet'][ d.metadata.name ] = d.spec.selector
     }
   } catch ( e ) { log.warn( 'list Deployment', ns, e.message ); errorState = true } 
@@ -314,7 +336,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sJobs.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      log.verbose( d.metadata.name, d )
+      // log.info( d.metadata.name, d )
       obj['Job'][ d.metadata.name ] = {}
     }  
   } catch ( e ) { log.verbose( 'list CronJob', ns, e.message ); } 
@@ -322,7 +344,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sJobB.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      log.verbose( d.metadata.name, d.spec )
+      // log.info( d.metadata.name, d.spec )
       obj['Job'][ d.metadata.name ] = {}
     }
   } catch ( e ) { log.warn( 'list CronJob.b', ns, e.message ); errorState = true } 
@@ -409,7 +431,7 @@ async function getPods( ns, nodes ) {
         let ms   = svc.msName
         let kind = aPod.metadata.ownerReferences[0].kind
         let podName = aPod.metadata.name
-        log.verbose( podName, svc )  
+        //log.info( podName, svc )  
 
         let pod = { }
         
@@ -439,9 +461,6 @@ async function getPods( ns, nodes ) {
         
         if ( ! pods[ ms ] ) { 
           pods[ ms ] = {}
-          // if ( obj[ kind ][ ms ] && obj[ kind ][ ms ].matchLabels ) {
-          //   pods[ ms ][ '_s' ] = obj[ kind ][ ms ].matchLabels
-          // } 
         }
         pods[ ms ][ podName ] = pod
           
@@ -467,6 +486,7 @@ function getPodWithAllDetails( pod, aPod ) {
       rc : 0,
       lt : Date.now()
     }
+
     if ( aPod.status.containerStatuses ) {
       for ( let c of aPod.status.containerStatuses ) {
         pod.c[ c.name ] = {
