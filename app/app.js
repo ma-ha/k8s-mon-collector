@@ -82,6 +82,7 @@ function printStatistics() {
     'Metrics sent:', sndDtaCnt,
     'Logs sent:', logStat,
     'Errors:', errCnt,
+    'Send Errors:', dtaSender.getSendErrCnt()
   )
   kubernetes.resetLogStat()
   sndDtaCnt = 0

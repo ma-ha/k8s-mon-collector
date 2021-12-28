@@ -1,3 +1,6 @@
+# 1.4.3
+- send ingress statistics (option)
+
 # 1.4.2
 - send logs on demand (to avoid "Payload too large" errors)
 

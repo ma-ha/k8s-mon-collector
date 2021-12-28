@@ -9,6 +9,7 @@ const cfg    = require( 'config' )
 const log    = require( 'npmlog' )
 const k8s    = require( '@kubernetes/client-node' )
 const stream = require( 'stream' )
+const aStat  = require( './dta-acc-stats' )
 
 exports: module.exports = {
   init,
@@ -38,7 +39,6 @@ let collCfg = []
 let plan = null
 // collector may get config not send out logs (compliance...)
 let collectLogs = true
-
 let dtaSender = null
 
 //-----------------------------------------------------------------------------
@@ -46,6 +46,7 @@ let dtaSender = null
 async function init( sender ) {
   try {
     dtaSender = sender 
+    aStat.init( sender )
     const kc = new k8s.KubeConfig()
     
     if ( process.env.KUBERNETES_SERVICE_HOST ) { 
@@ -103,6 +104,7 @@ function setCfg( collectorCfg ) {
       reSubscribeLogs()  
     }
   }
+  aStat.setCfg( collectorCfg )
 }
 
 //-----------------------------------------------------------------------------
@@ -212,14 +214,17 @@ async function subscribeContainerLogs( ns, ms, podName, containerName ) {
     const logStream = new stream.PassThrough();
 
     logStream.on( 'data', async (chunk) => {
+      let logStr =  chunk + ''
       podLogs.push({
         dt  : Date.now(),
         ns  : ns, 
         ms  : ms, 
         po  : podName, 
         c   : containerName,
-        log : chunk + ''
+        log : logStr
       })
+      aStat.extractStats( ns, ms, logStr )
+
       if ( podLogs.length >= cfg.LOG_SND_MAX_CNT ) {
         await pushLogs()
       }
@@ -259,6 +264,8 @@ async function getDta() {
     log.verbose( 'cluster', cluster.node  )
     log.verbose( 'cluster', cluster  )
 
+    await aStat.sendStats()
+
   } catch ( exc ) {
     log.error( 'getDta', exc.message )
     errorState = true
@@ -282,12 +289,6 @@ async function getNamespaceArr() {
 }
 
 //-----------------------------------------------------------------------------
-
-function noDefaultBackend( name ) {
-  if ( name.indexOf( 'backend' ) >= 0 ) { return false }
-  if ( name.indexOf( 'error' ) >= 0 ) { return false }
-  return true
-}
 
 async function loadMS( ns ) {
   let obj = {
@@ -395,9 +396,8 @@ async function getPodMetrics( ns ) {
   try {
     let topPods = await k8s.topPods( k8sApi, k8sMetrics, ns )
     for ( let pod of topPods ) try {
-      // log.verbose( pod.Pod.metadata.name, pod.cpu )
-      // let memMB  = getMemMB( pod.Memory.CurrentUsage )
-      log.verbose( pod.Pod.metadata.name, pod.CPU.CurrentUsage, pod.Memory.CurrentUsage  )
+      // if ( pod.Memory.LimitTotal )
+      // log.info( pod.Pod.metadata.name, pod.Memory.CurrentUsage, getMemMB( pod.Memory.CurrentUsage ),pod.Memory.LimitTotal, getMemMB( pod.Memory.LimitTotal ) )
       podMetrics[ pod.Pod.metadata.name ] = {
         cpu  : pod.CPU.CurrentUsage / 10, // TODO:investigate why we need that ??
         cpuL : pod.CPU.LimitTotal,

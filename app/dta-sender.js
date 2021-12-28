@@ -11,7 +11,9 @@ const log   = require( 'npmlog' )
 
 exports: module.exports = {
   sendDta,
-  sendLogs
+  sendLogs,
+  sendAccessStats,
+  getSendErrCnt
 }
 
 async function sendDta( dta ) {
@@ -22,6 +24,11 @@ async function sendLogs( dta ) {
   return await send( dta, '/mon/logs' )
 }
 
+async function sendAccessStats( dta ) {
+  return await send( dta, '/mon/access-stats' )
+}
+
+let errCnt = 0
 
 async function send( dta, path ) {
   return new Promise( ( resolve, reject ) => {
@@ -38,16 +45,26 @@ async function send( dta, path ) {
       ).then( req => {
         if ( req.request.res.statusCode != 200 ) {
           log.warn( sendDta, req.request.res.statusMessage )
+          errCnt ++
         }
         log.verbose( 'send res', req.data  )
         resolve( req.data )
       }).catch( error => {
         log.warn( 'send', path, error.message )
+        errCnt ++
         resolve({ error:error.message })
       })
     } catch ( exc ) {
       log.error( 'send', path, exc.message )
+      errCnt ++
       resolve({ error:error.message })
     }
   })
+}
+
+function getSendErrCnt() {
+  let result =0
+  result += errCnt
+  errCnt = 0
+  return result
 }
