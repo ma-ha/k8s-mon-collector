@@ -1,4 +1,7 @@
-# 1.4.3
+# 1.4.4
+- add missing RegExp config
+
+# 1.4.3 (broken)
 - send ingress statistics (option)
 
 # 1.4.2
