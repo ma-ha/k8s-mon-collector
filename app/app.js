@@ -42,7 +42,6 @@ start()
 
 
 let errCnt = 0 
-let sndDtaCnt = 0
 let errorState = false
 
 async function getDtaFromK8sAPI() {
@@ -67,7 +66,6 @@ async function getDtaFromK8sAPI() {
         errorState = false
         log.info( 'OK, back to normal operation :-)')
       }
-      sndDtaCnt++
     }
   }
 }
@@ -77,14 +75,13 @@ async function processLogs() {
 }
 
 function printStatistics() {
-  let logStat = kubernetes.getLogStat()
+  let dtaStat = dtaSender.getStats()
   log.info( (new Date()).toISOString(), 
-    'Metrics sent:', sndDtaCnt,
-    'Logs sent:', logStat,
-    'Errors:', errCnt,
-    'Send Errors:', dtaSender.getSendErrCnt()
+    'MetricsSent:',     dtaStat.sentDtaCnt,
+    'LogsSent:',        dtaStat.sentLogsCnt,
+    'AccessStatsSent:', dtaStat.sentAStsCnt,
+    'Errors:',          errCnt,
+    'SendErrors:',      dtaStat.errCnt
   )
-  kubernetes.resetLogStat()
-  sndDtaCnt = 0
   errCnt = 0
 }

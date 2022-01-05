@@ -16,8 +16,6 @@ exports: module.exports = {
   setCfg,
   getDta,
   pushLogs,
-  getLogStat,
-  resetLogStat,
   getErrState
 }
 
@@ -121,7 +119,6 @@ function getErrState() {
 let logStreamMap = {}
 let podLogs = []
 let pushing = false
-let logCntTot = 0
 
 async function pushLogs() {
   if ( pushing ) { return }
@@ -144,7 +141,6 @@ async function pushLogs() {
           }
         }
         logs[ cid ].logs.push({ ts: l.dt, log: l.log })  
-        logCntTot ++
       } catch ( exc ) { log.warn( 'pushLogs', l.ns, l.ms, l.po, l.c, exc.message ) }
       cnt --
     }
@@ -153,14 +149,6 @@ async function pushLogs() {
 
   } catch ( err ) { log.warn( 'pushLogs', err.message ) }
   pushing = false
-}
-
-function getLogStat() {
-  return logCntTot
-}
-
-function resetLogStat() {
-  logCntTot = 0
 }
 
 

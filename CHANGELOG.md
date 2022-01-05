@@ -1,3 +1,8 @@
+# 1.4.5
+- detect potential IPs to ban
+- retry for logs and stats send
+- log output refined pod stat 
+
 # 1.4.4
 - add missing RegExp config
 
