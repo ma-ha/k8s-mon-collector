@@ -21,7 +21,7 @@ Set via environment or config package files variables:
 - LOG_INTERVAL: in ms, default value is 10000 
 
 
-## Confogure Logging
+## Configure Logging
 
 See https://www.npmjs.com/package/npmlog
 
