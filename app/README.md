@@ -2,7 +2,7 @@
 
 This "Kubernetes Monitoring Collector" should run in your Kubernetes cluster to read out information, logs, metrics.
 
-By default data is sent to a [Kubernetes Monitor Service](https://www.kubernetes-monitor.com/) API. 
+By default data is sent to a [Kubernetes Monitor](https://www.kubernetes-monitor.com/) service API. 
 There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (E-Mail and/or Webhook per namespace) to your DevOps teams.
 
 Find detailed docu: https://www.kubernetes-monitor.com/
