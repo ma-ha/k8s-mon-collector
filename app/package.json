@@ -1,15 +1,32 @@
 {
-  "name": "mon-collector",
+  "name": "kubernetes-monitoring-collector",
   "version": "1.4.5",
-  "description": "Collect monitoring data and forward to monitoring central",
-  "main": "app.js",
+  "description": "Kubernetes monitoring: Collect data, logs and statistics and forward to a monitoring server.",
+  "main": "collector.js",
   "scripts": {
     "start": "node app.js"
   },
   "author": "MA-HA",
   "license": "Creative Commons Attribution-NoDerivatives 4.0 International License",
+  "keywords": [
+		"Kubernetes",
+		"Monitoring",
+		"Pods",
+		"Container",
+		"Namespaces",
+		"Logs",
+		"Metrics",
+		"Ingress",
+		"Status",
+		"Alarm",
+		"Access Logs"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ma-ha/k8s-mon-collector"
+	},
   "dependencies": {
-    "@kubernetes/client-node": "^0.16.1",
+    "@kubernetes/client-node": "^0.16.0",
     "axios": "^0.21.4",
     "config": "^3.3.6",
     "js-yaml": "^3.13.1",
