@@ -1,3 +1,7 @@
+# 1.4.6
+- Fix pod name in logs
+- SKIP_METRICS env var 
+
 # 1.4.5
 - detect potential IPs to ban
 - retry for logs and stats send

@@ -17,4 +17,8 @@ if ( ! cfg.MONITORING_CENTRAL_URL ) {
   process.exit( 1 )
 }
 
+if ( process.env.SKIP_METRICS ) {
+  log.warn( 'SKIP_METRICS is set ... really?' )
+}
+
 collector.start()

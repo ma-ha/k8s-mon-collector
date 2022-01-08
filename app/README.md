@@ -5,8 +5,6 @@ This "Kubernetes Monitoring Collector" should run in your Kubernetes cluster to 
 By default data is sent to a [Kubernetes Monitor](https://www.kubernetes-monitor.com/) service API. 
 There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (E-Mail and/or Webhook per namespace) to your DevOps teams.
 
-Find detailed docu: https://www.kubernetes-monitor.com/
-
 ![Web Dashboard](https://github.com/ma-ha/k8s-mon-collector/blob/main/img/dashoard.png)
 
 # Usage
@@ -19,7 +17,7 @@ Find detailed docu: https://www.kubernetes-monitor.com/
 Set via environment or config package files variables:
 - DATA_INTERVAL: in ms, default value is 30000
 - LOG_INTERVAL: in ms, default value is 10000 
-
+- SKIP_METRICS: set this, if you don't want to read out CPU/memory usage from metric server
 
 ## Configure Logging
 
@@ -28,8 +26,7 @@ See https://www.npmjs.com/package/npmlog
 # Install as Pod from Docker Hub
 
 You need to generate credentials for a "Monitoring Dashboard" per cluster:
-
-https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
+https://www.kubernetes-monitor.com/
 
 Install the "collector" pod:
 
@@ -51,9 +48,3 @@ Data is posted in JSON format to the following endpoints:
 
 HTTP Header contain `monid` and `key` (from env vars "EKOSYS_ID" and "EKOSYS_KEY") 
 to identify the clusters in a multi-tenant environment.
-
-# License
-
-<a rel="license" href="http://creativecommons.org/licenses/by-nd/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nd/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nd/4.0/">Creative Commons Attribution-NoDerivatives 4.0 International License</a>.
-
-https://creativecommons.org/licenses/by-nd/4.0/

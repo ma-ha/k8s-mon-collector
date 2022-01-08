@@ -37,6 +37,7 @@ let collCfg = []
 let plan = null
 // collector may get config not send out logs (compliance...)
 let collectLogs = true
+let collectAllLogs = false
 let dtaSender = null
 
 //-----------------------------------------------------------------------------
@@ -45,6 +46,7 @@ async function init( sender ) {
   try {
     dtaSender = sender 
     aStat.init( sender )
+    collectAllLogs = cfg.LOG_ALL_PODS
     const kc = new k8s.KubeConfig()
     
     if ( process.env.KUBERNETES_SERVICE_HOST ) { 
@@ -102,6 +104,11 @@ function setCfg( collectorCfg ) {
       reSubscribeLogs()  
     }
   }
+  if ( collectorCfg.collectAllLogs ) {
+    if ( collectLogs != collectorCfg.collectLogs ) {
+      collectLogs = collectorCfg.collectLogs 
+    }
+  } 
   aStat.setCfg( collectorCfg )
 }
 
@@ -131,7 +138,7 @@ async function pushLogs() {
     while ( cnt != 0 ) {
       let l = podLogs.shift()
       if ( l ) try { // prevent problems if pushLogs() runs multiple times
-        let cid = l.ns + l.ms
+        let cid = l.ns + l.po
         if ( ! logs[ cid ] ) {
           logs[ cid ] = {
             ns   : l.ns,
@@ -170,6 +177,7 @@ function reSubscribeLogs() {
   }
 }
 async function subscribePodLogs( ns, ms, podName, pod ) {
+  log.verbose( 'subscribePodLogs', ns, ms, podName )
   if ( collectLogs ) {
     for ( let containerName in pod.c ) {
       subscribeContainerLogs( ns, ms, podName, containerName )
@@ -182,7 +190,7 @@ async function subscribeContainerLogs( ns, ms, podName, containerName ) {
     let streamId =ns+'/'+podName+'/'+containerName
     let tailLines = 50
     if ( ! logStreamMap[ streamId ]  ) { // first time
-      log.verbose( 'subscribeContainerLogs initial', streamId )
+      log.info( 'subscribeContainerLogs initial', streamId )
       logStreamMap[ streamId ] = {
         ns        : ns, 
         ms        : ms,
@@ -381,7 +389,7 @@ function getMemMB( mem ) {
 
 async function getPodMetrics( ns ) {
   let podMetrics = {}
-  try {
+  if ( ! process.env.SKIP_METRICS ) try {
     let topPods = await k8s.topPods( k8sApi, k8sMetrics, ns )
     for ( let pod of topPods ) try {
       // if ( pod.Memory.LimitTotal )
@@ -423,7 +431,7 @@ async function getPods( ns, nodes ) {
 
         let pod = { }
         
-        if ( collCfg.indexOf( ns+'/'+ms ) >= 0 ) { // Pod is in scope !!
+        if ( needCollectLogs( ns, ms ) ) { 
           // log.info( 'collCfg', ns+'/'+ms, collCfg  )
           pod = getPodWithAllDetails( pod, aPod )
           if ( podMetrics[ podName ] ) {
@@ -460,6 +468,12 @@ async function getPods( ns, nodes ) {
   }
   // log.info( 'pods', pods )
   return pods
+}
+
+function needCollectLogs( ns, ms ) {
+  if ( collectAllLogs ) { return true }
+  if ( collCfg.indexOf( ns+'/'+ms ) >= 0 ) { return true } // Pod is in scope !!
+  return false
 }
 
 //-----------------------------------------------------------------------------
