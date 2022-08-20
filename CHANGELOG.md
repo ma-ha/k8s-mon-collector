@@ -1,4 +1,7 @@
-# 1.4.6
+# 1.4.8
+- Send status if something is wrong
+
+# 1.4.7
 - Fix pod name in logs
 - SKIP_METRICS env var 
 

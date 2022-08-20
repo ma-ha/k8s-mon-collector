@@ -294,7 +294,8 @@ async function loadMS( ns ) {
     'Job':{},
     'MinionIngress':{},
     'Ingress':{},
-    '_ing': {}
+    '_ing': {},
+    '_issue' : {}
   }
 
   try {
@@ -313,6 +314,7 @@ async function loadMS( ns ) {
     for ( let d of lst.body.items ) {
       // log.info( d.metadata.name,  d.spec.selector )
       obj['ReplicaSet'][ d.metadata.name ] = d.spec.selector
+      chkStatus( obj, d, 'Deployment' )
     }
   } catch ( e ) { log.warn( 'list Deployment', ns, e.message ); errorState = true } 
   
@@ -321,20 +323,24 @@ async function loadMS( ns ) {
     for ( let d of lst.body.items ) {
       log.verbose( d.metadata.name,  d.spec.selector )
       obj['DaemonSet'][ d.metadata.name ] = d.spec.selector
+      chkStatus( obj, d, 'DaemonSet' )
     }
   } catch ( e ) { log.warn( 'list DaemonSet', ns, e.message ); errorState = true } 
+
   try {
     let lst = await k8sApps.listNamespacedStatefulSet( ns )
     for ( let d of lst.body.items ) {
       log.verbose( d.metadata.name, d.spec.selector )
       obj['StatefulSet'][ d.metadata.name ] = d.spec.selector
+      chkStatus( obj, d, 'StatefulSet' )
     }
   } catch ( e ) { log.warn( 'list StatefulSet', ns, e.message ); errorState = true } 
+
   try {
     let lst = await k8sJobs.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name, d )
       obj['Job'][ d.metadata.name ] = {}
+      chkStatus( obj, d, 'CronJob' )
     }  
   } catch ( e ) { log.verbose( 'list CronJob', ns, e.message ); } 
   
@@ -343,40 +349,70 @@ async function loadMS( ns ) {
     for ( let d of lst.body.items ) {
       // log.info( d.metadata.name, d.spec )
       obj['Job'][ d.metadata.name ] = {}
+      chkStatus( obj, d, 'CronJob' )
     }
   } catch ( e ) { log.warn( 'list CronJob.b', ns, e.message ); errorState = true } 
 
   return obj
 }
 
+function chkStatus( obj, d, type ) {
+  let st = d.status
+  if ( st && st.lastScheduleTime ) {
+    // this is a CronJob
+  } else if ( st && st.replicas ) { // deployment, StatefulSet
+    if ( st.readyReplicas != st.replicas ) {
+      obj['_issue'][ d.metadata.name ] = st
+      obj['_issue'][ d.metadata.name ].type = type
+    } 
+  } else if ( st && st.desiredNumberScheduled ) { // DaemonSet
+    if ( st.numberReady != st.desiredNumberScheduled ) {
+      obj['_issue'][ d.metadata.name ] = st
+      obj['_issue'][ d.metadata.name ].type = type
+    } 
+  }
+}
+
 //-----------------------------------------------------------------------------
 
 function getMsName( aPod, obj ) {
-  let mgr = obj[ aPod.metadata.ownerReferences[0].kind ]
-  let labels = aPod.metadata.labels
-  log.verbose( aPod.metadata.name, labels )
-  if ( aPod.metadata.ownerReferences[0].kind == 'Job' ) {
-    for ( let x in mgr ) {
-      if ( aPod.metadata.name.indexOf( x ) == 0 ) {
-        return { msName : x }
-      }
+  try {
+    if ( aPod.labels && aPod.labels['app.kubernetes.io/name'] ) {
+      // https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
+      return { msName : aPod.labels['app.kubernetes.io/name'] }
     }
-  } else if ( mgr ) {
-    for ( let x in mgr ) {
-      let sel = mgr[ x ].matchLabels
-      let match = true
-      for ( let s in sel ) {
-        if ( labels[ s ]  &&  labels[ s ] == sel[ s ] ) {
-          // ok
-        } else {
-          match = false
+    let mgr = obj[ aPod.metadata.ownerReferences[0].kind ]
+    let labels = aPod.metadata.labels
+    log.verbose( aPod.metadata.name, labels )
+    if ( aPod.metadata.ownerReferences[0].kind == 'Job' ) {
+      for ( let x in mgr ) {
+        if ( aPod.metadata.name.indexOf( x ) == 0 ) {
+          return { msName : x }
         }
       }
-      if ( match ) {
-        return { msName : x }
+    } else if ( mgr ) {
+      for ( let x in mgr ) {
+        let sel = mgr[ x ].matchLabels
+        let match = true
+        for ( let s in sel ) {
+          if ( labels[ s ]  &&  labels[ s ] == sel[ s ] ) {
+            // ok
+          } else {
+            match = false
+          }
+        }
+        if ( match ) {
+          return { msName : x }
+        }
       }
     }
+  } catch ( exc ) {
+    log.warn( 'getMsName', exc.message)
   }
+  if ( aPod.labels && aPod.labels.app ) {
+    return { msName : aPod.labels.app }
+  }
+  return { msName : aPod.metadata.name } // better than nothing
 }
 
 function getMemMB( mem ) {
@@ -415,7 +451,8 @@ async function getPods( ns, nodes ) {
   let po = await k8sApi.listNamespacedPod( ns )
 
   let obj = await loadMS( ns )
-  pods[ '_ing' ] = obj[ '_ing' ]
+  pods[ '_ing' ]   = obj[ '_ing' ]
+  pods[ '_issue' ] = obj[ '_issue' ]
 
   let podMetrics = await getPodMetrics( ns )
 
@@ -423,16 +460,19 @@ async function getPods( ns, nodes ) {
     for ( let aPod of po.body.items ) {
       try {
         // log.info(  aPod.metadata.name, aPod.metadata.ownerReferences[0].kind )  
-        let svc  = getMsName( aPod, obj )
-        let ms   = svc.msName
-        let kind = aPod.metadata.ownerReferences[0].kind
+        let svc     = getMsName( aPod, obj )
+        let msName  = svc.msName
         let podName = aPod.metadata.name
+        let kind    = 'r'
+        try { 
+          kind =  aPod.metadata.ownerReferences[0].kind
+        } catch (e) { log.verbose( 'getPods', podName, e.message, aPod.metadata )}
         //log.info( podName, svc )  
 
         let pod = { }
         
-        if ( needCollectLogs( ns, ms ) ) { 
-          // log.info( 'collCfg', ns+'/'+ms, collCfg  )
+        if ( needCollectLogs( ns, msName ) ) { 
+          // log.info( 'collCfg', ns+'/'+msName, collCfg  )
           pod = getPodWithAllDetails( pod, aPod )
           if ( podMetrics[ podName ] ) {
             pod.cpu  =  podMetrics[ podName ].cpu
@@ -440,9 +480,9 @@ async function getPods( ns, nodes ) {
             pod.cpuL =  podMetrics[ podName ].cpuL
             pod.memL =  podMetrics[ podName ].memL
           }
-          subscribePodLogs( ns, ms, podName, pod )
+          subscribePodLogs( ns, msName, podName, pod )
         }
-        
+
         if ( podMetrics[ podName ] ) {
           // log.info( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu,  podMetrics[ podName ].cpu  )
           nodes[ aPod.spec.nodeName ].cpu += podMetrics[ podName ].cpu
@@ -455,10 +495,10 @@ async function getPods( ns, nodes ) {
         pod.k = ( kindMap[ kind ] ? kindMap[ kind ] : kind )
         pod.s = aPod.status.phase
         
-        if ( ! pods[ ms ] ) { 
-          pods[ ms ] = {}
+        if ( ! pods[ msName ] ) { 
+          pods[ msName ] = {}
         }
-        pods[ ms ][ podName ] = pod
+        pods[ msName ][ podName ] = pod
           
       } catch ( exc ) {
         log.warn( 'getPods', exc.message )

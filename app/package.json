@@ -1,6 +1,6 @@
 {
   "name": "kubernetes-monitoring-collector",
-  "version": "1.4.6",
+  "version": "1.4.8",
   "description": "Kubernetes monitoring: Collect data, logs and statistics and forward to a monitoring server.",
   "main": "collector.js",
   "scripts": {
