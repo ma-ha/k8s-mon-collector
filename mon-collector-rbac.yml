@@ -9,7 +9,7 @@ metadata:
   name: mon-collector
 rules:
 - apiGroups: [""] # indicates the core API group
-  resources: ["pods", "pods/log","nodes","namespaces"]
+  resources: ["pods", "pods/log","nodes","namespaces","persistentvolumes","persistentvolumeclaims"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["apps"] 
   resources: ["deployments","statefulsets","daemonsets"]
