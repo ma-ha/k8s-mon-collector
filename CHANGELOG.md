@@ -1,3 +1,6 @@
+# 1.5.1
+- fix "Cannot read property 'cpu' ..." exception
+
 # 1.5.0
 - pdate kubernetes/client-node package, see https://www.npmjs.com/package/@kubernetes/client-node
 - pod volumes

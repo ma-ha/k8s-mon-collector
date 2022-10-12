@@ -353,8 +353,8 @@ async function getPods( ns, nodes ) {
           nodes[ aPod.spec.nodeName ].cpu += podMetrics[ podName ].cpu
           nodes[ aPod.spec.nodeName ].mem += podMetrics[ podName ].mem
           log.verbose( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu )
+          log.verbose( aPod.spec.nodeName, podMetrics[ podName ].cpu, podMetrics[ podName ].mem)
         }
-        log.verbose( aPod.spec.nodeName, podMetrics[ podName ].cpu, podMetrics[ podName ].mem)
         
         pod.n = nodes[ aPod.spec.nodeName ].no
         pod.k = ( kindMap[ kind ] ? kindMap[ kind ] : kind )

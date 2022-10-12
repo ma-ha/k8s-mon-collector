@@ -50,14 +50,16 @@ function addPodVolumes( pod, aPod ) {
     for ( v of aPod.spec.volumes ) {
       if (  v.persistentVolumeClaim ) {
         let p = pvc[v.persistentVolumeClaim.claimName ]
-        pod.v[ v.name ] = {
-          pvc  : v.persistentVolumeClaim.claimName,
-          cap  : p.cap,
-          acc  : p.spec.accessModes,
-          sc   : p.spec.storageClassName,
-          mode : p.spec.volumeMode,
-          vol  : p.spec.volumeName,
-          status  : p.status.phase
+        if ( p ) {
+          pod.v[ v.name ] = {
+            pvc  : v.persistentVolumeClaim.claimName,
+            cap  : p.cap,
+            acc  : p.spec.accessModes,
+            sc   : p.spec.storageClassName,
+            mode : p.spec.volumeMode,
+            vol  : p.spec.volumeName,
+            status  : p.status.phase
+          }
         }
       }
     }
