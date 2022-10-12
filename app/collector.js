@@ -1,4 +1,4 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH
+/*  Copyright (c) 2022 Lean Cloud Services GmbH
 
     This work is licensed under 
     Creative Commons Attribution-NoDerivatives 4.0 International License.
@@ -63,7 +63,7 @@ async function getDtaFromK8sAPI() {
       kubernetes.setCfg( collCfg )
       if ( errorState  || kubernetes.getErrState() ) {
         errorState = false
-        log.info( 'OK, back to normal operation :-)')
+        log.info( (new Date()).toISOString(), 'OK, back to normal operation :-)')
       }
     }
   }

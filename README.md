@@ -1,5 +1,3 @@
-
-
 # Kubernetes Monitoring Collector
 
 This is a monitoring "collector" pod running in your cluster and reading info from the Kubernetes API and metrics API. 
@@ -8,7 +6,6 @@ The data is sent to a [Kubernetes Monitor Service](https://www.kubernetes-monito
 There you can configure a web dashboard and configure alarms (missing data, pod or container error status) and send notifications (email and/or webhook per namespace) to your DevOps teams.
 
 Detailed docu: https://www.kubernetes-monitor.com/
-
 
 ![Web Dashboard](https://github.com/ma-ha/k8s-mon-collector/blob/main/img/dashoard.png)
 
@@ -80,6 +77,9 @@ Should look like:
 The deployment should be compliant to best practice security policies.
 
 The Collector Service is open source, you're welcome to review the source code.
+
+REMARK: Kubernetes v1.20 (or older) may not work with `k8s-mon-collector:1.5.0` (or higher) version. 
+You can edit the [mon-collector.yml](mon-collector.yml) and use `k8s-mon-collector:1.4.8` instead.
 
 ## Done :-)
 

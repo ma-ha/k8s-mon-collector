@@ -1,10 +1,9 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH
+/*  Copyright (c) 2022 Lean Cloud Services GmbH
 
     This work is licensed under 
     Creative Commons Attribution-NoDerivatives 4.0 International License.
-    http://creativecommons.org/licenses/by-nd/4.0/ 
-*/
-
+    http://creativecommons.org/licenses/by-nd/4.0/ */
+    
 const axios = require( 'axios' )
 const cfg   = require( 'config' )
 const log   = require( 'npmlog' )
@@ -23,18 +22,22 @@ let sndStats = {
   errCnt: 0
 }
 async function sendDta( dta ) {
+  //log.info( 'dta', dta['namespace']['kube-system'] )
   sndStats.sentDtaCnt ++
-  return await send( dta, '/mon/dta' )
+  let sndResult = await send( dta, '/mon/dta' )
+  return sndResult
 }
 
 let resendLogs = []
 async function sendLogs( dta ) {
+  log.verbose( 'sendLogs...' )
   while ( resendLogs.length > 0 ) {
     let snd = await send( resendLogs[0], '/mon/logs' )
     if ( snd.error ) { return }
-    log.info( '... resend logs: OK' )
+    log.info(  (new Date()).toISOString(), '... resend logs: OK' )
     resendLogs.shift()
   }
+  // log.info( 'logs:', JSON.stringify( dta ) )
   let snd = await send( dta, '/mon/logs' )
   if ( snd.error ) {
     resendLogs.push( dta )
@@ -50,7 +53,7 @@ async function sendAccessStats( dta ) {
   while ( resendStats.length > 0 ) {
     let snd = await send( resendStats[0], '/mon/access-stats' )
     if ( snd.error ) { return }
-    log.info( '... resend ingress stats: OK' )
+    log.info(  (new Date()).toISOString(), '... resend ingress stats: OK' )
     resendStats.shift()
   }
   let snd = await send( dta, '/mon/access-stats' )
@@ -83,14 +86,14 @@ async function send( dta, path ) {
         log.verbose( 'send res', req.data  )
         resolve( req.data )
       }).catch( error => {
-        log.warn( 'send', path, error.message )
+        log.warn(  (new Date()).toISOString(), 'send', path, error.message )
         sndStats.errCnt ++
         resolve({ error:error.message })
       })
     } catch ( exc ) {
-      log.error( 'send', path, exc.message )
+      log.error(  (new Date()).toISOString(), 'send', path, exc.message )
       sndStats.errCnt ++
-      resolve({ error:error.message })
+      resolve({ error: exc.message })
     }
   })
 }

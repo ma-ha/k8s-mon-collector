@@ -1,4 +1,4 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH
+/*  Copyright (c) 2022 Lean Cloud Services GmbH
 
     This work is licensed under 
     Creative Commons Attribution-NoDerivatives 4.0 International License.
@@ -8,8 +8,8 @@
 const cfg    = require( 'config' )
 const log    = require( 'npmlog' )
 const k8s    = require( '@kubernetes/client-node' )
-const stream = require( 'stream' )
-const aStat  = require( './dta-acc-stats' )
+const podLog = require( './dta-logs' )
+const podPVC = require( './dta-volumes' )
 
 exports: module.exports = {
   init,
@@ -33,19 +33,12 @@ let k8sJobB = null
 let k8sNetw = null
 let k8sLogs = null
 let k8sMetrics = null 
-let collCfg = []
 let plan = null
-// collector may get config not send out logs (compliance...)
-let collectLogs = true
-let collectAllLogs = false
-let dtaSender = null
 
 //-----------------------------------------------------------------------------
 
 async function init( sender ) {
   try {
-    dtaSender = sender 
-    aStat.init( sender )
     collectAllLogs = cfg.LOG_ALL_PODS
     const kc = new k8s.KubeConfig()
     
@@ -70,11 +63,13 @@ async function init( sender ) {
     k8sJobs = kc.makeApiClient( k8s.BatchV1Api )
     k8sJobB = kc.makeApiClient( k8s.BatchV1beta1Api )
     k8sNetw = kc.makeApiClient( k8s.NetworkingV1Api )
+    k8sSto  = kc.makeApiClient( k8s.StorageV1Api )
     k8sMetrics = new k8s.Metrics( kc )
     k8sLogs    = new k8s.Log(kc);
 
-    setInterval( reSubscribeLogs, 1000 * 60 * cfg.LOG_RENEW_STREAM_MIN )
-
+    podLog.init( k8sLogs, sender )
+    podPVC.init( k8sApi )
+    
   } catch ( exc ) {
     console.error( exc )
     log.error( exc )
@@ -95,21 +90,7 @@ function setCfg( collectorCfg ) {
   if ( collectorCfg.plan ) {
     plan =  collectorCfg.plan
   }
-  if ( collectorCfg.ms) {
-    collCfg = collectorCfg.ms
-  }
-  if ( collectorCfg.collectLogs) {
-    if ( collectLogs != collectorCfg.collectLogs ) {
-      collectLogs = collectorCfg.collectLogs
-      reSubscribeLogs()  
-    }
-  }
-  if ( collectorCfg.collectAllLogs ) {
-    if ( collectLogs != collectorCfg.collectLogs ) {
-      collectLogs = collectorCfg.collectLogs 
-    }
-  } 
-  aStat.setCfg( collectorCfg )
+  podLog.setConfig( collectorCfg )
 }
 
 //-----------------------------------------------------------------------------
@@ -121,122 +102,8 @@ function getErrState() {
   return result
 }
 
-//-----------------------------------------------------------------------------
-// https://nodejs.org/api/stream.html#readabledestroyerror
-let logStreamMap = {}
-let podLogs = []
-let pushing = false
-
 async function pushLogs() {
-  if ( pushing ) { return }
-  pushing = true
-  let cnt = podLogs.length
-  log.verbose( 'push logs', cnt )
-  if ( cnt > cfg.LOG_SND_MAX_CNT ) { cnt = cfg.LOG_SND_MAX_CNT }
-  if ( cnt > 0 ) try {
-    let logs = {}
-    while ( cnt != 0 ) {
-      let l = podLogs.shift()
-      if ( l ) try { // prevent problems if pushLogs() runs multiple times
-        let cid = l.ns + l.po
-        if ( ! logs[ cid ] ) {
-          logs[ cid ] = {
-            ns   : l.ns,
-            ms   : l.ms,
-            pod  : l.po,
-            logs : []
-          }
-        }
-        logs[ cid ].logs.push({ ts: l.dt, log: l.log })  
-      } catch ( exc ) { log.warn( 'pushLogs', l.ns, l.ms, l.po, l.c, exc.message ) }
-      cnt --
-    }
-    // send out the logs
-    await dtaSender.sendLogs( logs )
-
-  } catch ( err ) { log.warn( 'pushLogs', err.message ) }
-  pushing = false
-}
-
-
-function reSubscribeLogs() {
-  //log.info( 'reSubscribeLogs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-  for ( let streamId in logStreamMap ) {
-    let oldStream = logStreamMap[ streamId ].logStream
-    log.verbose( 'subscribePodLogs, destroy old stream', streamId )
-    oldStream.destroy()
-    logStreamMap[ streamId ].logStream = null
-    if ( collectLogs ) {
-      subscribeContainerLogs( 
-        logStreamMap[ streamId ].ns, 
-        logStreamMap[ streamId ].ms, 
-        logStreamMap[ streamId ].pod, 
-        logStreamMap[ streamId ].container 
-      )
-    }
-  }
-}
-async function subscribePodLogs( ns, ms, podName, pod ) {
-  log.verbose( 'subscribePodLogs', ns, ms, podName )
-  if ( collectLogs ) {
-    for ( let containerName in pod.c ) {
-      subscribeContainerLogs( ns, ms, podName, containerName )
-    }
-  }
-}
-
-async function subscribeContainerLogs( ns, ms, podName, containerName ) {
-  try {
-    let streamId =ns+'/'+podName+'/'+containerName
-    let tailLines = 50
-    if ( ! logStreamMap[ streamId ]  ) { // first time
-      log.info( 'subscribeContainerLogs initial', streamId )
-      logStreamMap[ streamId ] = {
-        ns        : ns, 
-        ms        : ms,
-        pod       : podName, 
-        container : containerName,
-        logStream : null
-      }
-    } else { 
-      if ( logStreamMap[ streamId ].logStream ) {
-        return // nothing to do
-      } else { // strea was destroyed to resubscribe
-        log.verbose( 'subscribeContainerLogs resubscribe', streamId )
-        tailLines = 0
-      }
-    }
-
-    const logStream = new stream.PassThrough();
-
-    logStream.on( 'data', async (chunk) => {
-      let logStr =  chunk + ''
-      podLogs.push({
-        dt  : Date.now(),
-        ns  : ns, 
-        ms  : ms, 
-        po  : podName, 
-        c   : containerName,
-        log : logStr
-      })
-      aStat.extractStats( ns, ms, logStr )
-
-      if ( podLogs.length >= cfg.LOG_SND_MAX_CNT ) {
-        await pushLogs()
-      }
-      // log.info( 'Log...', podName, containerName, chunk+'' )
-    })
-
-    logStreamMap[ streamId ].logStream = logStream
-
-    k8sLogs.log( ns, podName, containerName, logStream, 
-      { follow: true, tailLines: tailLines, pretty: false, timestamps: false } )
-    .catch( err => { log.error( 'k8sLogs',  ns, podName, containerName, err.message ) } )
-    .then( req => {} )
-    
-  } catch ( exc ) {
-    log.warn( 'getLogs' , exc.message )
-  }
+  await podLog.pushLogs()
 }
 
 //-----------------------------------------------------------------------------
@@ -248,6 +115,7 @@ async function getDta() {
   try {
     cluster.node = await getNode()
     cluster.namespace =  await getNamespaceArr()
+    podPVC.loadPvcArr()
 
     for ( let ns in cluster.namespace ) {
       let pods = await getPods( ns, cluster.node )
@@ -260,8 +128,6 @@ async function getDta() {
     log.verbose( 'cluster', cluster.node  )
     log.verbose( 'cluster', cluster  )
 
-    await aStat.sendStats()
-
   } catch ( exc ) {
     log.error( 'getDta', exc.message )
     errorState = true
@@ -271,7 +137,6 @@ async function getDta() {
 }
 
 //-----------------------------------------------------------------------------
-
 // https://kubernetes-client.github.io/javascript/classes/corev1api.corev1api-1.html
 async function getNamespaceArr() {
   let nsMap = {}
@@ -312,7 +177,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sApps.listNamespacedDeployment( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name,  d.spec.selector )
+      log.verbose( d.metadata.name,  d.spec.selector )
       obj['ReplicaSet'][ d.metadata.name ] = d.spec.selector
       chkStatus( obj, d, 'Deployment' )
     }
@@ -347,7 +212,7 @@ async function loadMS( ns ) {
   try {
     let lst = await k8sJobB.listNamespacedCronJob( ns )
     for ( let d of lst.body.items ) {
-      // log.info( d.metadata.name, d.spec )
+      log.verbose( d.metadata.name, d.spec )
       obj['Job'][ d.metadata.name ] = {}
       chkStatus( obj, d, 'CronJob' )
     }
@@ -429,7 +294,7 @@ async function getPodMetrics( ns ) {
     let topPods = await k8s.topPods( k8sApi, k8sMetrics, ns )
     for ( let pod of topPods ) try {
       // if ( pod.Memory.LimitTotal )
-      // log.info( pod.Pod.metadata.name, pod.Memory.CurrentUsage, getMemMB( pod.Memory.CurrentUsage ),pod.Memory.LimitTotal, getMemMB( pod.Memory.LimitTotal ) )
+      log.verbose( pod.Pod.metadata.name, pod.Memory.CurrentUsage, getMemMB( pod.Memory.CurrentUsage ),pod.Memory.LimitTotal, getMemMB( pod.Memory.LimitTotal ) )
       podMetrics[ pod.Pod.metadata.name ] = {
         cpu  : pod.CPU.CurrentUsage / 10, // TODO:investigate why we need that ??
         cpuL : pod.CPU.LimitTotal,
@@ -459,7 +324,7 @@ async function getPods( ns, nodes ) {
   if ( po.body && po.body.items ) {
     for ( let aPod of po.body.items ) {
       try {
-        // log.info(  aPod.metadata.name, aPod.metadata.ownerReferences[0].kind )  
+        log.verbose(  aPod.metadata.name, aPod.metadata.ownerReferences[0].kind )  
         let svc     = getMsName( aPod, obj )
         let msName  = svc.msName
         let podName = aPod.metadata.name
@@ -467,12 +332,11 @@ async function getPods( ns, nodes ) {
         try { 
           kind =  aPod.metadata.ownerReferences[0].kind
         } catch (e) { log.verbose( 'getPods', podName, e.message, aPod.metadata )}
-        //log.info( podName, svc )  
+        log.verbose( podName, svc )  
 
         let pod = { }
         
-        if ( needCollectLogs( ns, msName ) ) { 
-          // log.info( 'collCfg', ns+'/'+msName, collCfg  )
+        if ( podLog.needCollectLogs( ns, msName ) ) { 
           pod = getPodWithAllDetails( pod, aPod )
           if ( podMetrics[ podName ] ) {
             pod.cpu  =  podMetrics[ podName ].cpu
@@ -480,41 +344,36 @@ async function getPods( ns, nodes ) {
             pod.cpuL =  podMetrics[ podName ].cpuL
             pod.memL =  podMetrics[ podName ].memL
           }
-          subscribePodLogs( ns, msName, podName, pod )
+          podLog.subscribePodLogs( ns, msName, podName, pod )
+          podPVC.addPodVolumes( pod, aPod )
         }
 
         if ( podMetrics[ podName ] ) {
-          // log.info( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu,  podMetrics[ podName ].cpu  )
+          log.verbose( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu,  podMetrics[ podName ].cpu  )
           nodes[ aPod.spec.nodeName ].cpu += podMetrics[ podName ].cpu
           nodes[ aPod.spec.nodeName ].mem += podMetrics[ podName ].mem
-          // log.info( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu )
+          log.verbose( aPod.spec.nodeName+'<'+podName, nodes[ aPod.spec.nodeName ].cpu )
         }
-        // log.info( aPod.spec.nodeName, podMetrics[ podName ].cpu, podMetrics[ podName ].mem)
+        log.verbose( aPod.spec.nodeName, podMetrics[ podName ].cpu, podMetrics[ podName ].mem)
         
         pod.n = nodes[ aPod.spec.nodeName ].no
         pod.k = ( kindMap[ kind ] ? kindMap[ kind ] : kind )
         pod.s = aPod.status.phase
-        
+       
         if ( ! pods[ msName ] ) { 
           pods[ msName ] = {}
         }
         pods[ msName ][ podName ] = pod
-          
       } catch ( exc ) {
         log.warn( 'getPods', exc.message )
         errorState = true
       }
     }
   }
-  // log.info( 'pods', pods )
+  log.verbose( 'pods', pods )
   return pods
 }
 
-function needCollectLogs( ns, ms ) {
-  if ( collectAllLogs ) { return true }
-  if ( collCfg.indexOf( ns+'/'+ms ) >= 0 ) { return true } // Pod is in scope !!
-  return false
-}
 
 //-----------------------------------------------------------------------------
 
@@ -569,7 +428,7 @@ async function getNode() {
     let top = await k8s.topNodes( k8sApi )
     for ( let topNo of top ) {
       let nodeName = topNo.Node.metadata.name
-      // log.info( 'cpu', topNo.CPU, topNo.Memory )
+      log.verbose( 'cpu', topNo.CPU, topNo.Memory )
       nodeMap[ nodeName ].cpu     = 0
       nodeMap[ nodeName ].cpuCapa = topNo.CPU.Capacity
       nodeMap[ nodeName ].cpuReq  = topNo.CPU.RequestTotal

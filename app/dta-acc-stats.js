@@ -1,4 +1,4 @@
-/*  Copyright (c) 2021 Lean Cloud Services GmbH
+/*  Copyright (c) 2022 Lean Cloud Services GmbH
 
     This work is licensed under 
     Creative Commons Attribution-NoDerivatives 4.0 International License.

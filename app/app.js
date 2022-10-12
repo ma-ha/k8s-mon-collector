@@ -10,7 +10,9 @@ const cfg        = require( 'config' )
 const log        = require( 'npmlog' )
 const collector  = require( './collector' )
 
-log.info( `Starting ${pjson.name} v${pjson.version}`, `NODE_ENV=${process.env.NODE_ENV}` )
+log.info( (new Date()).toISOString(),
+  `Starting ${pjson.name} v${pjson.version}`,
+  `NODE_ENV=${process.env.NODE_ENV}` )
 
 if ( ! cfg.MONITORING_CENTRAL_URL ) {
   log.error( 'Configuration required!')

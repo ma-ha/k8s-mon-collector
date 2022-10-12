@@ -1,3 +1,8 @@
+# 1.5.0
+- pdate kubernetes/client-node package, see https://www.npmjs.com/package/@kubernetes/client-node
+- pod volumes
+- refactoring
+
 # 1.4.8
 - Send status if something is wrong
 
