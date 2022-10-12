@@ -27,6 +27,9 @@ Install the "collector" pod:
           --from-literal=key="$MONITORING_KEY" 
     kubectl apply -f mon-collector.yml -n monitoring 
 
+Open the dashboard https://www.kubernetes-monitor.com/, 
+and configure services to monitor.
+
 # Install Collector As Pod (from Docker Hub)
 
 The original config files and here: https://github.com/ma-ha/k8s-mon-collector
