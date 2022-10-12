@@ -11,11 +11,12 @@ Detailed docu: https://www.kubernetes-monitor.com/
 
 # TL;DR
 
-You need to generate credentials for a "Monitoring Dashboard" per cluster:
+You need to generate credentials for a "Monitoring Dashboard" per cluster.
+
+"Free Tier" credentials unlock all feature and has no time limitation:
 
 https://lcs.online-service.cloud/index.html?layout=product-nonav&id=613c6222be1a810011a01665
 
-("Free Trial" credentials unlock all feature and has no time limitation.)
 
 Install the "collector" pod:
 
