@@ -1,3 +1,6 @@
+# DEPRECATED
+Kubernetes Monitor service is no longer public available.
+
 # Kubernetes Monitoring Collector
 
 This is a monitoring "collector" pod running in your cluster and reading info from the Kubernetes API and metrics API. 
