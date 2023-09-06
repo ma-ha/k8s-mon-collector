@@ -80,7 +80,7 @@ async function send( dta, path ) {
         }
       ).then( req => {
         if ( req.request.res.statusCode != 200 ) {
-          log.warn( sendDta, req.request.res.statusMessage )
+          log.warn( 'send', req.request.res.statusMessage )
           sndStats.errCnt ++
         }
         log.verbose( 'send res', req.data  )
